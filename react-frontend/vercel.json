@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://seedlingspeaks-backend.onrender.com/api/:path*"
+      "destination": "https://seedlingspeaks-backend-0vkj.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
