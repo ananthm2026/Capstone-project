@@ -1,0 +1,71 @@
+{
+  "name": "seedlingspeaks-widget",
+  "productName": "SeedlingSpeaks Widget",
+  "version": "1.0.0",
+  "description": "SeedlingSpeaks Desktop Widget — push-to-talk translation assistant",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "npx electron-builder --mac",
+    "dist:dir": "npx electron-builder --mac --dir"
+  },
+  "build": {
+    "appId": "com.seedlinglabs.widget",
+    "productName": "SeedlingSpeaks Widget",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "icon.png",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "SeedlingSpeaks needs microphone access for push-to-talk translation.",
+        "NSAppleEventsUsageDescription": "SeedlingSpeaks needs Accessibility to detect the active app and insert translated text."
+      }
+    },
+    "dmg": {
+      "title": "SeedlingSpeaks Widget",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "files": [
+      "main.js",
+      "overlay.js",
+      "overlay.html",
+      "bubble.html",
+      "toast.html",
+      "screen-overlay.html",
+      "region-select.html",
+      "click-overlay.html",
+      "mode-menu.html",
+      "recording-popup.html",
+      "fill_compose.sh",
+      "icon.png",
+      "ax_insert_text",
+      "ax_text_at_cursor",
+      "fn_watcher",
+      "space_hook",
+      "ax_insert_text.swift",
+      "ax_text_at_cursor.swift",
+      "fn_watcher.swift"
+    ],
+    "extraResources": []
+  },
+  "keywords": [],
+  "author": "Seedlinglabs",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^41.0.3",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "uiohook-napi": "^1.5.5"
+  }
+}

@@ -1,0 +1,252 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* ========== Floating Icon ========== */
+#vt-floating-icon {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 2147483647;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.1);
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#vt-floating-icon:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12);
+}
+#vt-floating-icon:active { cursor: grabbing; transform: scale(0.95); }
+#vt-floating-icon.vt-icon-active {
+  background: #111;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 0 0 3px rgba(26,26,26,0.12);
+}
+
+/* ========== Toast ========== */
+#vt-ext-toast {
+  position: fixed;
+  bottom: 88px;
+  right: 24px;
+  z-index: 2147483647;
+  background: #1a1a1a;
+  color: #f8f8f8;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  max-width: 240px;
+  pointer-events: none;
+  animation: vt-toast-in 0.2s ease;
+}
+@keyframes vt-toast-in {
+  from { opacity:0; transform: translateY(6px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+/* ========== Selection Popup ========== */
+#vt-selection-popup {
+  position: absolute;
+  z-index: 2147483647;
+  display: flex;
+  gap: 2px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  animation: vt-popup-in 0.15s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes vt-popup-in {
+  from { opacity:0; transform: translateY(8px) scale(0.94); }
+  to   { opacity:1; transform: translateY(0) scale(1); }
+}
+#vt-selection-popup::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 5px;
+  background: #1a1a1a;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+#vt-selection-popup button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+#vt-selection-popup button:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+/* ========== Spinner ========== */
+.vt-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(26,26,26,0.12);
+  border-top-color: #1a1a1a;
+  border-radius: 50%;
+  animation: vt-spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes vt-spin { to { transform: rotate(360deg); } }
+
+/* ========== Inline translated text ========== */
+.vt-translated-inline {
+  background: rgba(26,26,26,0.07);
+  border-bottom: 2px solid #1a1a1a;
+  border-radius: 2px;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: default;
+  display: inline;
+}
+.vt-undo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 3px;
+  padding: 0 4px;
+  height: 15px;
+  background: #1a1a1a;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.12s;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+.vt-undo-btn:hover { opacity: 1; }
+.vt-translating-mark {
+  background: rgba(26,26,26,0.08);
+  border-radius: 2px;
+  animation: vt-pulse-mark 0.7s ease-in-out infinite alternate;
+}
+@keyframes vt-pulse-mark {
+  from { background: rgba(26,26,26,0.04); }
+  to   { background: rgba(26,26,26,0.14); }
+}
+.vt-translated-element { border-bottom: 2px dotted #1a1a1a !important; }
+
+/* ========== Panel ========== */
+#vt-popup-panel {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  z-index: 2147483646 !important;
+  width: 360px !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  margin-right: calc(-1 * (100vw - 100%)) !important;
+  background: #f8f8f8 !important;
+  border: none !important;
+  border-left: 1px solid #ececec !important;
+  border-radius: 0 !important;
+  box-shadow: -8px 0 32px rgba(0,0,0,0.08) !important;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  color: #1a1a1a !important;
+  line-height: 1.4 !important;
+  box-sizing: border-box !important;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+#vt-popup-panel * {
+  box-sizing: border-box !important;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+}
+
+/* ── Header ── */
+#vt-panel-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 14px 16px !important;
+  background: #ffffff !important;
+  flex-shrink: 0 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  border-bottom: 1px solid #ececec !important;
+}
+
+/* ── Action grid ── */
+#vt-action-bar {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 6px !important;
+  padding: 10px 12px !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #ececec !important;
+  flex-shrink: 0 !important;
+}
+
+/* ── Scrollable content ── */
+#vt-tab-content {
+  flex: 1 !important;
+  overflow-y: hidden !important;
+  padding: 12px 12px 8px !important;
+  background: #f8f8f8 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ── Tone bar (pinned above mic bar) ── */
+#vt-tone-bar {
+  padding: 10px 12px !important;
+  background: #ffffff !important;
+  border-top: 1px solid #ececec !important;
+  flex-shrink: 0 !important;
+}
+
+/* ── Mic bottom bar ── */
+#vt-mic-bar {
+  padding: 10px 12px 14px !important;
+  background: #ffffff !important;
+  border-top: 1px solid #ececec !important;
+  flex-shrink: 0 !important;
+}
+
+/* ── Tone chips ── */
+.vt-tone-chip {
+  transition: all 0.12s !important;
+}
+.vt-tone-chip:hover {
+  border-color: #1a1a1a !important;
+  color: #1a1a1a !important;
+}
