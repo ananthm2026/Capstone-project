@@ -8,6 +8,7 @@ POST /api/vision-translate     → Image OCR + translation
 POST /api/back-translate       → Back-translate quality check
 """
 import os
+import asyncio
 import logging
 from typing import Optional
 from uuid import uuid4
@@ -224,7 +225,9 @@ async def handle_vision_translate(
     )
 
     try:
-        regions = vision_translate_image(image_bytes, content_type, target_language)
+        regions = await asyncio.to_thread(
+            vision_translate_image, image_bytes, content_type, target_language
+        )
         return {"regions": regions, "count": len(regions)}
     except Exception as e:
         logger.error(f"Vision translate error: {e}")

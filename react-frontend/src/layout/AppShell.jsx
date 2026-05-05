@@ -65,7 +65,7 @@ export default function AppShell({ children }) {
         failCountRef.current += 1;
         if (failCountRef.current >= 2) setOnline(false);
       }
-      pollRef.current = setTimeout(check, online ? 30000 : 120000);
+      pollRef.current = setTimeout(check, online ? 30000 : 10000);
     };
     const initTimer = setTimeout(check, 3000);
     const onFocus = () => {

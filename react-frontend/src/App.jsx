@@ -1,13 +1,11 @@
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AppProvider, useApp } from './context/AppContext';
+import { AppProvider } from './context/AppContext';
 import AppShellLayout from './layout/AppShell';
 import SplashScreen from './components/SplashScreen';
 import AuthPage from './pages/AuthPage';
 import DesktopAuth from './pages/DesktopAuth';
 import LandingPage from './pages/LandingPage';
-import WidgetSetup from './pages/WidgetSetup';
-
 // Pages
 import AppHome from './pages/AppHome';
 import Home from './pages/Home';
@@ -33,35 +31,20 @@ function RequireAuth({ children }) {
 }
 
 /**
- * RequireSetup — Protects routes that need setup completion.
- * Redirects to /widget-setup if setup not done.
- */
-function RequireSetup({ children }) {
-  const { state } = useApp();
-  const { isSignedIn, isLoaded } = useAuth();
-  if (!isLoaded) return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  if (!isSignedIn) return <Navigate to="/auth" replace />;
-  if (!state.widgetSetupDone) return <Navigate to="/widget-setup" replace />;
-  return children;
-}
-
-/**
  * ProtectedAppShell — Wraps all authenticated /app routes with AppShell layout.
- * Enforces both auth and setup requirements.
  */
 function ProtectedAppShell({ children }) {
   return (
-    <RequireSetup>
+    <RequireAuth>
       <AppShellLayout>{children}</AppShellLayout>
-    </RequireSetup>
+    </RequireAuth>
   );
 }
 
 /**
  * AppRoutes — Nested routing with AppShell as parent layout.
  * - Public routes: /, /landing, /auth, /splash
- * - Setup route: /widget-setup (auth required)
- * - App routes: /app/* (auth + setup required, wrapped by AppShell)
+ * - App routes: /app/* (auth required, wrapped by AppShell)
  */
 function AppRoutes() {
   return (
@@ -73,17 +56,7 @@ function AppRoutes() {
       <Route path="/desktop-auth" element={<DesktopAuth />} />
       <Route path="/splash" element={<SplashScreen />} />
 
-      {/* Widget setup — auth required, setup not done */}
-      <Route
-        path="/widget-setup"
-        element={
-          <RequireAuth>
-            <WidgetSetup />
-          </RequireAuth>
-        }
-      />
-
-      {/* App routes — auth + setup required, with AppShell layout */}
+      {/* App routes — auth required, with AppShell layout */}
       <Route
         path="/app"
         element={
