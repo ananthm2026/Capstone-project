@@ -73,7 +73,7 @@ export default function Sidebar({ isOpen, onClose, onOpen, topOffset = 0 }) {
           <NavBtn icon={Ear}      label={L.continuousListening} active={is('/app/continuous')}        onClick={nav('/app/continuous')} badge={isLive ? (session.state === 'listening' ? '● LIVE' : '⏸') : null} />
           <NavBtn icon={Globe}    label={L.englishToNative}     active={is('/app/english-to-native')} onClick={nav('/app/english-to-native')} />
           <NavBtn icon={ScanText} label={L.visionTranslate}     active={is('/app/vision')}            onClick={nav('/app/vision')} />
-          <NavBtn icon={Film}     label="Video Translate"        active={is('/app/video')}             onClick={nav('/app/video')} />
+          <NavBtn icon={Film}     label="Video Subtitles"        active={is('/app/video')}             onClick={nav('/app/video')} />
           <SectionLabel label={L.library} />
           <NavBtn icon={Clock}        label={L.history}    active={is('/app/history')}    onClick={nav('/app/history')} />
         </nav>

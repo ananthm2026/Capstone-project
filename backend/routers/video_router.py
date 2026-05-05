@@ -1,16 +1,18 @@
 """
-video_router.py — Video translation endpoints.
-POST /api/video/upload  → upload video, get video_id
-POST /api/video/translate → process and return translated video
-GET  /api/video/{video_id} → download translated video
+video_router.py — Video subtitle generation endpoints.
+POST /api/video/upload          → upload video, get video_id
+POST /api/video/subtitle        → start subtitle generation job
+GET  /api/video/status/{id}     → poll job status
+GET  /api/video/download/{id}   → download subtitled video
+GET  /api/video/srt/{id}        → download SRT file
 """
 import os
 import uuid
+import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import aiofiles
@@ -22,18 +24,15 @@ TEMP_DIR = Path("temp_video")
 TEMP_DIR.mkdir(exist_ok=True)
 
 SUPPORTED_EXT = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
-MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200MB
-CHUNK_SIZE = 1024 * 1024  # 1MB
+MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB
+CHUNK_SIZE = 1024 * 1024            # 1 MB read chunks
 
-# In-memory job store: video_id → { status, path, result, error }
 _jobs: dict = {}
 
 
-class TranslateRequest(BaseModel):
+class SubtitleRequest(BaseModel):
     video_id: str
     target_language: str = "hi-IN"
-    voice_type: str = "female"   # male | female
-    tone: str = "formal"          # formal | casual
 
 
 def _cleanup(path: str):
@@ -46,88 +45,61 @@ def _cleanup(path: str):
 
 @router.post("/upload")
 async def upload_video(file: UploadFile = File(...)):
-    """Upload a video file. Returns video_id for use in /translate."""
     filename = file.filename or "video.mp4"
     ext = Path(filename).suffix.lower()
-
     if ext not in SUPPORTED_EXT:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported format '{ext}'. Use: {', '.join(SUPPORTED_EXT)}"
-        )
+        raise HTTPException(400, f"Unsupported format '{ext}'. Use: {', '.join(SUPPORTED_EXT)}")
 
     video_id = str(uuid.uuid4())[:12]
     save_path = str(TEMP_DIR / f"{video_id}{ext}")
-
     file_size = 0
+
     try:
         async with aiofiles.open(save_path, "wb") as f:
             while chunk := await file.read(CHUNK_SIZE):
                 file_size += len(chunk)
                 if file_size > MAX_VIDEO_SIZE:
-                    raise HTTPException(status_code=413, detail="Video too large. Max 200MB.")
+                    raise HTTPException(413, "Video too large. Max 200MB.")
                 await f.write(chunk)
     except HTTPException:
         _cleanup(save_path)
         raise
     except Exception as e:
         _cleanup(save_path)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))
 
     _jobs[video_id] = {"status": "uploaded", "path": save_path, "result": None, "error": None}
-    logger.info(f"[video] Uploaded {filename} → {video_id} ({file_size/1024:.1f}KB)")
-
+    logger.info(f"[video] uploaded {filename} → {video_id} ({file_size/1024:.1f}KB)")
     return {"video_id": video_id, "filename": filename, "size_kb": round(file_size / 1024, 1)}
 
 
-@router.post("/translate")
-async def translate_video(req: TranslateRequest, background_tasks: BackgroundTasks):
-    """Start video translation. Returns immediately; poll /status/{video_id}."""
+@router.post("/subtitle")
+async def start_subtitle_job(req: SubtitleRequest):
     job = _jobs.get(req.video_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Video not found. Please upload first.")
+        raise HTTPException(404, "Video not found. Upload first.")
     if job["status"] == "processing":
-        raise HTTPException(status_code=409, detail="Already processing.")
+        raise HTTPException(409, "Already processing.")
 
-    job["status"] = "processing"
-    job["error"] = None
-    job["result"] = None
+    job.update({"status": "processing", "error": None, "result": None,
+                "target_language": req.target_language})
 
-    background_tasks.add_task(
-        _run_translation,
-        req.video_id,
-        job["path"],
-        req.target_language,
-        req.voice_type,
-        req.tone,
-    )
-
+    asyncio.create_task(_run_job(req.video_id, job["path"], req.target_language))
     return {"video_id": req.video_id, "status": "processing"}
 
 
-def _run_translation(video_id: str, video_path: str, target_language: str, voice_type: str, tone: str):
-    """Background task — runs the full pipeline."""
-    from services.video_service import process_video_translation, check_ffmpeg
-
+async def _run_job(video_id: str, video_path: str, target_language: str):
     job = _jobs.get(video_id)
     if not job:
         return
-
     try:
+        from services.video_service import process_video_subtitles, check_ffmpeg
         if not check_ffmpeg():
             raise RuntimeError("ffmpeg is not installed on this server.")
-
-        result = process_video_translation(
-            video_path=video_path,
-            target_language=target_language,
-            voice_type=voice_type,
-            tone=tone,
-        )
-
+        result = await asyncio.to_thread(process_video_subtitles, video_path, target_language)
         job["status"] = "done"
         job["result"] = result
         logger.info(f"[video] {video_id} done → {result['output_path']}")
-
     except Exception as e:
         logger.error(f"[video] {video_id} failed: {e}")
         job["status"] = "error"
@@ -136,44 +108,55 @@ def _run_translation(video_id: str, video_path: str, target_language: str, voice
 
 @router.get("/status/{video_id}")
 def get_status(video_id: str):
-    """Poll translation status."""
     job = _jobs.get(video_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Video not found.")
-
+        raise HTTPException(404, "Video not found.")
     if job["status"] == "done" and job["result"]:
         r = job["result"]
         return {
             "status": "done",
             "video_id": video_id,
             "download_url": f"/api/video/download/{video_id}",
+            "srt_url": f"/api/video/srt/{video_id}",
             "source_language": r.get("source_language"),
             "transcript": r.get("transcript"),
             "translated_text": r.get("translated_text"),
-            "emotion": r.get("emotion"),
-            "confidence": r.get("confidence"),
+            "segment_count": r.get("segment_count"),
         }
-
-    return {
-        "status": job["status"],
-        "video_id": video_id,
-        "error": job.get("error"),
-    }
+    return {"status": job["status"], "video_id": video_id, "error": job.get("error")}
 
 
 @router.get("/download/{video_id}")
 def download_video(video_id: str):
-    """Download the translated video."""
     job = _jobs.get(video_id)
     if not job or job["status"] != "done":
-        raise HTTPException(status_code=404, detail="Translated video not ready.")
+        raise HTTPException(404, "Subtitled video not ready.")
+    path = job["result"]["output_path"]
+    if not os.path.exists(path):
+        raise HTTPException(404, "File not found on server.")
+    return FileResponse(path=path, media_type="video/mp4", filename=f"subtitled_{video_id}.mp4")
 
-    output_path = job["result"]["output_path"]
-    if not os.path.exists(output_path):
-        raise HTTPException(status_code=404, detail="File not found on server.")
 
-    return FileResponse(
-        path=output_path,
-        media_type="video/mp4",
-        filename=f"translated_{video_id}.mp4",
-    )
+@router.get("/srt/{video_id}")
+def download_srt(video_id: str):
+    job = _jobs.get(video_id)
+    if not job or job["status"] != "done":
+        raise HTTPException(404, "SRT not ready.")
+    srt_path = job["result"].get("srt_path", "")
+    if not srt_path or not os.path.exists(srt_path):
+        raise HTTPException(404, "SRT file not found.")
+    return FileResponse(path=srt_path, media_type="text/plain", filename=f"subtitles_{video_id}.srt")
+
+
+@router.get("/vtt/{video_id}")
+def get_vtt(video_id: str):
+    job = _jobs.get(video_id)
+    if not job or job["status"] != "done":
+        raise HTTPException(404, "VTT not ready.")
+    vtt_path = job["result"].get("vtt_path", "")
+    if not vtt_path or not os.path.exists(vtt_path):
+        raise HTTPException(404, "VTT file not found.")
+    from fastapi.responses import Response
+    with open(vtt_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return Response(content=content, media_type="text/vtt", headers={"Access-Control-Allow-Origin": "*"})

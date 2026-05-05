@@ -375,7 +375,7 @@ export const getEnglishToNativeSessions = async (userId) => {
   return data;
 };
 
-// ── Video translation ─────────────────────────────────────────────────────────
+// ── Video subtitles ───────────────────────────────────────────────────────────
 export const uploadVideo = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
@@ -386,8 +386,8 @@ export const uploadVideo = async (file) => {
   return data; // { video_id, filename, size_kb }
 };
 
-export const translateVideo = async ({ video_id, target_language, voice_type, tone }) => {
-  const { data } = await API.post('/video/translate', { video_id, target_language, voice_type, tone });
+export const generateSubtitles = async ({ video_id, target_language }) => {
+  const { data } = await API.post('/video/subtitle', { video_id, target_language });
   return data;
 };
 
