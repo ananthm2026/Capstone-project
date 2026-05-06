@@ -1,8 +1,11 @@
 import axios from 'axios';
 import { toast } from '../components/Toast';
 
+const isDev = import.meta.env.MODE === 'development';
 const API = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/api`,
+  baseURL: import.meta.env.VITE_API_URL 
+    ? `${import.meta.env.VITE_API_URL}/api` 
+    : (isDev ? 'http://127.0.0.1:8000/api' : '/api'),
   timeout: 120000,
 });
 
