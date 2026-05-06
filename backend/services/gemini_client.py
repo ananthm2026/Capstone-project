@@ -457,6 +457,10 @@ Your task:
 3. Translate each block to {lang_name}
 4. Return bounding box coordinates for each block
 
+IMPORTANT translation rules:
+- Ensure the 'translated' field is ALWAYS in {lang_name} script (e.g. Devanagari for Hindi, Kannada script for Kannada), even if the original text is in English.
+- Do NOT return English in the 'translated' field if the target language is not English.
+
 IMPORTANT grouping rules:
 - Do NOT split a sentence into multiple blocks
 - Do NOT create more than 15 blocks total — merge nearby related text
@@ -487,7 +491,7 @@ Coordinate rules:
 - Output ONLY the JSON array, nothing else"""
 
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         image_part = {"mime_type": image_mime, "data": image_bytes}
         response = model.generate_content(
             [prompt, image_part],

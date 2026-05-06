@@ -38,7 +38,6 @@ const MENU_SECTIONS = [
     title: 'Account',
     items: [
       { name: 'history', label: 'History', icon: '🕐', route: '/(drawer)/history' },
-      { name: 'keyboard-setup', label: 'Keyboard Setup', icon: '⌨️', route: '/keyboard-setup' },
       { name: 'profile', label: 'Profile', icon: '👤', route: '/(drawer)/profile' },
       { name: 'settings', label: 'Settings', icon: '⚙️', route: '/(drawer)/settings' },
     ],

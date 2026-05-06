@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Alert, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -60,71 +60,74 @@ export default function EnglishToNativeScreen() {
   }
 
   return (
-    <View style={[st.root, { paddingTop: insets.top }]}>
-      <View style={st.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={st.backBtn}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={st.headerTitle}>Text Translate</Text>
-        <View style={{ width: 50 }} />
-      </View>
-
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
-        {/* English Input */}
-        <View style={st.card}>
-          <View style={st.cardHeader}>
-            <View style={[st.dot, { backgroundColor: COLORS.greenSoft }]} />
-            <Text style={st.cardLabel}>English</Text>
-          </View>
-          <TextInput
-            style={st.textarea}
-            placeholder="Type or paste English text here..."
-            placeholderTextColor={COLORS.faded}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            textAlignVertical="top"
-          />
-          <Text style={st.charCount}>{inputText.length} characters</Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={[st.root, { paddingTop: insets.top }]}>
+        <View style={st.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={st.backBtn}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={st.headerTitle}>Text Translate</Text>
+          <View style={{ width: 50 }} />
         </View>
 
-        {/* Translate Button */}
-        <TouchableOpacity style={[st.translateBtn, !inputText.trim() && { opacity: 0.5 }]} onPress={handleTranslate} disabled={!inputText.trim() || isTranslating}>
-          {isTranslating ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={st.translateBtnText}>Translate to {targetLangName}</Text>}
-        </TouchableOpacity>
-
-        {/* Language Picker */}
-        <TouchableOpacity style={st.langBtn} onPress={() => setShowPicker(!showPicker)}>
-          <Text style={st.langBtnText}>{targetLangName}</Text>
-          <Text>{showPicker ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
-        {showPicker && (
-          <View style={st.pickerDrop}>
-            {LANG_ENTRIES.map(([name, code]) => (
-              <TouchableOpacity key={code} style={[st.pickerItem, code === targetLang && { backgroundColor: COLORS.saffronLight }]} onPress={() => { setTargetLang(code); setTargetLangName(name); setShowPicker(false); }}>
-                <Text style={[st.pickerText, code === targetLang && { color: COLORS.saffron, fontWeight: '700' }]}>{name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Output */}
-        {translatedText ? (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
+          {/* English Input */}
           <View style={st.card}>
             <View style={st.cardHeader}>
-              <View style={[st.dot, { backgroundColor: COLORS.saffron }]} />
-              <Text style={st.cardLabel}>{targetLangName}</Text>
-              <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={handleCopy}>
-                <Text style={st.copyBtn}>{copied ? '✓ Copied' : '📋 Copy'}</Text>
-              </TouchableOpacity>
+              <View style={[st.dot, { backgroundColor: COLORS.greenSoft }]} />
+              <Text style={st.cardLabel}>English</Text>
             </View>
-            <Text style={st.outputText}>{translatedText}</Text>
+            <TextInput
+              style={st.textarea}
+              placeholder="Type or paste English text here..."
+              placeholderTextColor={COLORS.faded}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              textAlignVertical="top"
+            />
+            <Text style={st.charCount}>{inputText.length} characters</Text>
           </View>
-        ) : null}
-      </ScrollView>
-    </View>
+
+          {/* Translate Button */}
+          <TouchableOpacity style={[st.translateBtn, !inputText.trim() && { opacity: 0.5 }]} onPress={handleTranslate} disabled={!inputText.trim() || isTranslating}>
+            {isTranslating ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={st.translateBtnText}>Translate to {targetLangName}</Text>}
+          </TouchableOpacity>
+
+          {/* Language Picker */}
+          <TouchableOpacity style={st.langBtn} onPress={() => setShowPicker(!showPicker)}>
+            <Text style={st.langBtnText}>{targetLangName}</Text>
+            <Text>{showPicker ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {showPicker && (
+            <View style={st.pickerDrop}>
+              {LANG_ENTRIES.map(([name, code]) => (
+                <TouchableOpacity key={code} style={[st.pickerItem, code === targetLang && { backgroundColor: COLORS.saffronLight }]} onPress={() => { setTargetLang(code); setTargetLangName(name); setShowPicker(false); }}>
+                  <Text style={[st.pickerText, code === targetLang && { color: COLORS.saffron, fontWeight: '700' }]}>{name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Output */}
+          {translatedText ? (
+            <View style={st.card}>
+              <View style={st.cardHeader}>
+                <View style={[st.dot, { backgroundColor: COLORS.saffron }]} />
+                <Text style={st.cardLabel}>{targetLangName}</Text>
+                <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={handleCopy}>
+                  <Text style={st.copyBtn}>{copied ? '✓ Copied' : '📋 Copy'}</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={st.outputText}>{translatedText}</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
+
 
 const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },

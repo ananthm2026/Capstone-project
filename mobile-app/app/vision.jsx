@@ -24,6 +24,20 @@ export default function VisionScreen() {
   const [showPicker, setShowPicker] = useState(false);
 
   async function pickImage(useCamera) {
+    if (useCamera) {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please enable camera access in your settings to use this feature.');
+        return;
+      }
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please enable gallery access in your settings to use this feature.');
+        return;
+      }
+    }
+
     const method = useCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
     const result = await method({ mediaTypes: ['images'], quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
@@ -41,8 +55,8 @@ export default function VisionScreen() {
       setRegions(result.regions || []);
       
       if (result.regions && result.regions.length > 0) {
-        const fullOriginal = result.regions.map(r => r.text).join('\n');
-        const fullTranslation = result.regions.map(r => r.translation).join('\n');
+        const fullOriginal = result.regions.map(r => r.original).join('\n');
+        const fullTranslation = result.regions.map(r => r.translated).join('\n');
         addHistory({
           id: Date.now().toString(),
           text: fullOriginal,
@@ -134,16 +148,17 @@ export default function VisionScreen() {
                       <View style={st.regionBadge}>
                         <Text style={st.regionBadgeText}>{i + 1}</Text>
                       </View>
-                      <TouchableOpacity onPress={() => Clipboard.setStringAsync(r.translation || r.text)}>
+                      <TouchableOpacity onPress={() => Clipboard.setStringAsync(r.translated || r.original)}>
                         <Text style={st.copyBtn}>📋</Text>
                       </TouchableOpacity>
                     </View>
-                    <Text style={st.originalText}>{r.text}</Text>
-                    {r.translation && <Text style={st.translatedText}>{r.translation}</Text>}
+                    <Text style={st.originalText}>{r.original}</Text>
+                    {r.translated && <Text style={st.translatedText}>{r.translated}</Text>}
                   </View>
                 ))}
               </>
             )}
+
           </>
         )}
       </ScrollView>

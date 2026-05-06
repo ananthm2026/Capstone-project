@@ -4,10 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import { Video } from 'expo-av';
 import { COLORS } from '../src/constants/colors';
 import { TARGET_LANGUAGES } from '../src/constants/languages';
 import { useApp } from '../src/context/AppContext';
-import api from '../src/services/api';
+import api, { BASE_URL } from '../src/services/api';
 
 const LANG_ENTRIES = Object.entries(TARGET_LANGUAGES);
 
@@ -23,6 +24,8 @@ export default function VideoScreen() {
   const [targetLangName, setTargetLangName] = useState('Hindi');
   const [showPicker, setShowPicker] = useState(false);
   const [result, setResult] = useState(null);
+  const [subtitles, setSubtitles] = useState([]);
+  const [currentSubtitle, setCurrentSubtitle] = useState('');
   const pollRef = useRef(null);
 
   useEffect(() => {
@@ -49,10 +52,13 @@ export default function VideoScreen() {
       pollRef.current = setInterval(async () => {
         try {
           const status = await api.getVideoStatus(uploadRes.video_id);
-          if (status.status === 'completed') {
+          if (status.status === 'done') {
             clearInterval(pollRef.current);
             setResult(status);
             setStep(3);
+            
+            // Fetch and parse VTT
+            fetchVTT(uploadRes.video_id);
             
             addHistory({
               id: Date.now().toString(),
@@ -84,6 +90,53 @@ export default function VideoScreen() {
     setVideoName('');
     setVideoId(null);
     setResult(null);
+  }
+
+  const playbackUrl = videoId ? `${BASE_URL}/api/video/download/${videoId}` : null;
+
+  async function fetchVTT(vid) {
+    try {
+      const response = await fetch(`${BASE_URL}/api/video/vtt/${vid}`);
+      const text = await response.text();
+      parseVTT(text);
+    } catch (e) {
+      console.error('VTT fetch failed', e);
+    }
+  }
+
+  function parseVTT(data) {
+    const lines = data.split('\n');
+    const parsed = [];
+    let current = null;
+
+    for (let line of lines) {
+      line = line.trim();
+      if (line.includes('-->')) {
+        const [startStr, endStr] = line.split(' --> ');
+        current = {
+          start: parseVTTTime(startStr),
+          end: parseVTTTime(endStr),
+          text: ''
+        };
+      } else if (current && line && !line.startsWith('WEBVTT')) {
+        current.text = line;
+        parsed.push(current);
+        current = null;
+      }
+    }
+    setSubtitles(parsed);
+  }
+
+  function parseVTTTime(str) {
+    const [hms, ms] = str.split('.');
+    const parts = hms.split(':').map(Number);
+    let sec = 0;
+    if (parts.length === 3) {
+      sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else {
+      sec = parts[0] * 60 + parts[1];
+    }
+    return sec * 1000 + Number(ms);
   }
 
   return (
@@ -153,6 +206,33 @@ export default function VideoScreen() {
               <Text style={st.successText}>Translation complete!</Text>
             </View>
 
+            {playbackUrl && (
+              <View style={st.videoContainer}>
+                <Video
+                  source={{ uri: playbackUrl }}
+                  rate={1.0}
+                  volume={1.0}
+                  isMuted={false}
+                  resizeMode="contain"
+                  shouldPlay
+                  useNativeControls
+                  style={st.video}
+                  onPlaybackStatusUpdate={(status) => {
+                    if (status.isLoaded && subtitles.length > 0) {
+                      const timeMs = status.positionMillis;
+                      const active = subtitles.find(s => timeMs >= s.start && timeMs <= s.end);
+                      setCurrentSubtitle(active ? active.text : '');
+                    }
+                  }}
+                />
+                {currentSubtitle ? (
+                  <View style={st.subtitleOverlay} pointerEvents="none">
+                    <Text style={st.subtitleText}>{currentSubtitle}</Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+
             <Text style={st.sectionTitle}>Original Transcript</Text>
             <View style={st.textCard}>
               <Text style={st.cardText}>{result.transcript || 'No transcript available'}</Text>
@@ -168,6 +248,7 @@ export default function VideoScreen() {
             </TouchableOpacity>
           </>
         )}
+
       </ScrollView>
     </View>
   );
@@ -203,4 +284,22 @@ const st = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontWeight: '700', color: COLORS.ink, marginBottom: 8 },
   textCard: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: COLORS.border },
   cardText: { fontSize: 14, color: COLORS.ink, lineHeight: 22 },
+  videoContainer: { backgroundColor: '#000', borderRadius: 16, overflow: 'hidden', marginBottom: 20, height: 250 },
+  video: { width: '100%', height: '100%' },
+  subtitleOverlay: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  subtitleText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
 });

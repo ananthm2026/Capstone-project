@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOAuth, useSignIn, useSignUp, useAuth, useUser } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
@@ -127,99 +127,102 @@ export default function SignInScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[st.root, { paddingTop: insets.top }]}>
-        <ScrollView contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
-          {/* Brand Header */}
-          <View style={st.brand}>
-            <Text style={st.logoEmoji}>🌱</Text>
-            <Text style={st.appName}>SeedlingSpeaks</Text>
-            <Text style={st.tagline}>Your voice, every language, every tone.</Text>
-          </View>
-
-          {/* Features */}
-          <View style={st.features}>
-            {[
-              'Transcribe speech in 10 Indian languages',
-              'Translate to any native language instantly',
-              'Rewrite in Email, Slack, LinkedIn tones',
-              'Vision translate from photos',
-              'Continuous hands-free listening',
-            ].map((f) => (
-              <View key={f} style={st.featureRow}>
-                <Text style={st.checkmark}>✓</Text>
-                <Text style={st.featureText}>{f}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Auth Card */}
-          <View style={st.card}>
-            <Text style={st.cardTitle}>{isSignUp ? 'Create your account' : 'Welcome back'}</Text>
-            <Text style={st.cardSubtitle}>{isSignUp ? 'Sign up to get started' : 'Sign in to continue'}</Text>
-
-            {error ? (
-              <View style={st.errorBox}>
-                <Text style={st.errorText}>{error}</Text>
-              </View>
-            ) : null}
-
-            {/* Google OAuth — Primary */}
-            <TouchableOpacity style={st.googleBtn} onPress={handleGoogleOAuth} disabled={oauthLoading} activeOpacity={0.8}>
-              {oauthLoading ? (
-                <ActivityIndicator color={COLORS.ink} size="small" />
-              ) : (
-                <>
-                  <Text style={st.googleIcon}>G</Text>
-                  <Text style={st.googleBtnText}>Continue with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View style={st.divider}>
-              <View style={st.dividerLine} />
-              <Text style={st.dividerText}>or</Text>
-              <View style={st.dividerLine} />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={[st.root, { paddingTop: insets.top }]}>
+          <ScrollView contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
+            {/* Brand Header */}
+            <View style={st.brand}>
+              <Text style={st.logoEmoji}>🌱</Text>
+              <Text style={st.appName}>SeedlingSpeaks</Text>
+              <Text style={st.tagline}>Your voice, every language, every tone.</Text>
             </View>
 
-            {/* Email/Password Toggle */}
-            {!showEmailForm ? (
-              <TouchableOpacity style={st.emailToggle} onPress={() => setShowEmailForm(true)}>
-                <Text style={st.emailToggleText}>Continue with email</Text>
-              </TouchableOpacity>
-            ) : (
-              <>
-                {isSignUp && (
-                  <View style={st.nameRow}>
-                    <TextInput style={[st.input, { flex: 1 }]} placeholder="First name" placeholderTextColor={COLORS.faded} value={firstName} onChangeText={setFirstName} autoCapitalize="words" />
-                    <TextInput style={[st.input, { flex: 1 }]} placeholder="Last name" placeholderTextColor={COLORS.faded} value={lastName} onChangeText={setLastName} autoCapitalize="words" />
-                  </View>
+            {/* Features */}
+            <View style={st.features}>
+              {[
+                'Transcribe speech in 10 Indian languages',
+                'Translate to any native language instantly',
+                'Rewrite in Email, Slack, LinkedIn tones',
+                'Vision translate from photos',
+                'Continuous hands-free listening',
+              ].map((f) => (
+                <View key={f} style={st.featureRow}>
+                  <Text style={st.checkmark}>✓</Text>
+                  <Text style={st.featureText}>{f}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Auth Card */}
+            <View style={st.card}>
+              <Text style={st.cardTitle}>{isSignUp ? 'Create your account' : 'Welcome back'}</Text>
+              <Text style={st.cardSubtitle}>{isSignUp ? 'Sign up to get started' : 'Sign in to continue'}</Text>
+
+              {error ? (
+                <View style={st.errorBox}>
+                  <Text style={st.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              {/* Google OAuth — Primary */}
+              <TouchableOpacity style={st.googleBtn} onPress={handleGoogleOAuth} disabled={oauthLoading} activeOpacity={0.8}>
+                {oauthLoading ? (
+                  <ActivityIndicator color={COLORS.ink} size="small" />
+                ) : (
+                  <>
+                    <Text style={st.googleIcon}>G</Text>
+                    <Text style={st.googleBtnText}>Continue with Google</Text>
+                  </>
                 )}
+              </TouchableOpacity>
 
-                <TextInput style={st.input} placeholder="Email address" placeholderTextColor={COLORS.faded} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
-                <TextInput style={st.input} placeholder="Password" placeholderTextColor={COLORS.faded} value={password} onChangeText={setPassword} secureTextEntry />
+              {/* Divider */}
+              <View style={st.divider}>
+                <View style={st.dividerLine} />
+                <Text style={st.dividerText}>or</Text>
+                <View style={st.dividerLine} />
+              </View>
 
-                <TouchableOpacity style={[st.submitBtn, loading && { opacity: 0.7 }]} onPress={isSignUp ? handleSignUp : handleSignIn} disabled={loading || !email.trim() || !password.trim()}>
-                  {loading ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={st.submitBtnText}>{isSignUp ? 'Create account' : 'Sign in'}</Text>}
+              {/* Email/Password Toggle */}
+              {!showEmailForm ? (
+                <TouchableOpacity style={st.emailToggle} onPress={() => setShowEmailForm(true)}>
+                  <Text style={st.emailToggleText}>Continue with email</Text>
                 </TouchableOpacity>
-              </>
-            )}
+              ) : (
+                <>
+                  {isSignUp && (
+                    <View style={st.nameRow}>
+                      <TextInput style={[st.input, { flex: 1 }]} placeholder="First name" placeholderTextColor={COLORS.faded} value={firstName} onChangeText={setFirstName} autoCapitalize="words" />
+                      <TextInput style={[st.input, { flex: 1 }]} placeholder="Last name" placeholderTextColor={COLORS.faded} value={lastName} onChangeText={setLastName} autoCapitalize="words" />
+                    </View>
+                  )}
 
-            {/* Switch mode */}
-            <TouchableOpacity style={st.toggleBtn} onPress={() => { setMode(isSignUp ? 'signin' : 'signup'); setError(''); }}>
-              <Text style={st.toggleText}>
-                {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-                <Text style={st.toggleLink}>{isSignUp ? 'Sign in' : 'Sign up'}</Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
+                  <TextInput style={st.input} placeholder="Email address" placeholderTextColor={COLORS.faded} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+                  <TextInput style={st.input} placeholder="Password" placeholderTextColor={COLORS.faded} value={password} onChangeText={setPassword} secureTextEntry />
 
-          <Text style={st.footer}>Powered by Seedlinglabs · v2.5</Text>
-        </ScrollView>
-      </View>
+                  <TouchableOpacity style={[st.submitBtn, loading && { opacity: 0.7 }]} onPress={isSignUp ? handleSignUp : handleSignIn} disabled={loading || !email.trim() || !password.trim()}>
+                    {loading ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={st.submitBtnText}>{isSignUp ? 'Create account' : 'Sign in'}</Text>}
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {/* Switch mode */}
+              <TouchableOpacity style={st.toggleBtn} onPress={() => { setMode(isSignUp ? 'signin' : 'signup'); setError(''); }}>
+                <Text style={st.toggleText}>
+                  {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                  <Text style={st.toggleLink}>{isSignUp ? 'Sign in' : 'Sign up'}</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={st.footer}>Powered by Seedlinglabs · v2.5</Text>
+          </ScrollView>
+        </View>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
+
 
 const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1a0f00' },

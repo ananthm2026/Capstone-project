@@ -158,6 +158,7 @@ def process_video_subtitles(video_path: str, target_language: str) -> dict:
         uid = str(uuid.uuid4())
         srt_path = str(TEMP_DIR / f"{uid}.srt")
         vtt_path = str(TEMP_DIR / f"{uid}.vtt")
+        subtitled_video_path = str(TEMP_DIR / f"subtitled_{uid}.mp4")
 
         with open(srt_path, "w", encoding="utf-8") as f:
             f.write(build_srt(segments))

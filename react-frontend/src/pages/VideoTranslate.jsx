@@ -126,7 +126,7 @@ export default function VideoTranslate() {
             Video Subtitles
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-faded)', margin: '2px 0 0' }}>
-            Upload a video — get subtitles burned in your language
+            Upload a video — get subtitles in your language
           </p>
         </div>
         {step > 0 && (
@@ -216,7 +216,7 @@ export default function VideoTranslate() {
                 <ChevronDown style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, color: 'var(--text-faded)', pointerEvents: 'none' }} />
               </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-faded)', marginTop: 8 }}>
-                Audio will be transcribed and subtitles burned into the video
+                Audio will be transcribed and translated instantly
               </p>
             </div>
 
@@ -247,10 +247,10 @@ export default function VideoTranslate() {
               <p style={{ fontSize: '0.8rem', color: 'var(--text-faded)', margin: 0, lineHeight: 1.6 }}>
                 🎙 Transcribing audio in chunks<br />
                 🌐 Translating to <strong>{langName}</strong><br />
-                🎬 Burning subtitles into video
+                🎬 Preparing side-loaded captions
               </p>
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-faded)' }}>This takes 1–3 minutes depending on video length</p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-faded)' }}>This takes 1–2 minutes depending on video length</p>
           </div>
         )}
 

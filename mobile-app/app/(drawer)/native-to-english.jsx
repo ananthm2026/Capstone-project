@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Alert, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as Clipboard from 'expo-clipboard';
@@ -147,123 +147,126 @@ export default function NativeToEnglishScreen() {
   const fmtTime = `${String(Math.floor(timer / 60)).padStart(2, '0')}:${String(timer % 60).padStart(2, '0')}`;
 
   return (
-    <View style={[st.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={st.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={openDrawer} style={st.hamburger}>
-            <Text style={st.hamburgerText}>☰</Text>
-          </TouchableOpacity>
-          <View>
-            <Text style={st.headerTitle}>Speech to Text</Text>
-            <Text style={st.headerSub}>{englishText ? 'Transcript ready to edit' : 'Ready to start'}</Text>
-          </View>
-        </View>
-        <Text style={st.versionBadge}>v2.5</Text>
-      </View>
-
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 20 }]} showsVerticalScrollIndicator={false}>
-
-
-        {/* Toolbar */}
-        {englishText ? (
-          <View style={st.toolbar}>
-            <TouchableOpacity style={st.toolBtn} onPress={handleTranslate} disabled={translating}>
-              <Text style={st.toolBtnText}>{translating ? 'Translating...' : 'Translate'}</Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={[st.root, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={st.header}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={openDrawer} style={st.hamburger}>
+              <Text style={st.hamburgerText}>☰</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[st.toolBtn, { backgroundColor: COLORS.surface }]} onPress={() => setShowTonePicker(!showTonePicker)}>
-              <Text style={[st.toolBtnText, { color: COLORS.ink }]}>{selectedTone || 'Retone'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {showTonePicker && (
-          <View style={st.pickerDrop}>
-            {TONES.map((t) => (
-              <TouchableOpacity key={t} style={st.pickerItem} onPress={() => handleRetone(t)}>
-                <Text style={st.pickerText}>{t}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Mode tabs */}
-        {englishText ? (
-          <View style={st.modeTabs}>
-            {['transcript', 'retoned', 'translation'].map((m) => (
-              <TouchableOpacity key={m} style={[st.modeTab, mode === m && st.modeTabActive]} onPress={() => setMode(m)} disabled={m === 'retoned' && !rewrittenText || m === 'translation' && !nativeTranslation}>
-                <Text style={[st.modeTabText, mode === m && st.modeTabTextActive]}>{m.charAt(0).toUpperCase() + m.slice(1)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : null}
-
-        {/* Output */}
-        {transcribing ? (
-          <View style={st.emptyState}>
-            <ActivityIndicator size="large" color={COLORS.saffron} />
-            <Text style={st.emptyText}>Transcribing audio...</Text>
-          </View>
-        ) : retoning ? (
-          <View style={st.emptyState}>
-            <ActivityIndicator size="large" color={COLORS.saffron} />
-            <Text style={st.emptyText}>Shaping your message...</Text>
-          </View>
-        ) : activeText ? (
-          <View style={st.outputCard}>
-            <View style={st.outputHeader}>
-              <Text style={st.outputLabel}>{mode === 'translation' ? 'Translation' : mode === 'retoned' ? 'Retoned' : 'Transcript'}</Text>
-              {confidenceScore != null && mode === 'transcript' && (
-                <View style={[st.badge, { backgroundColor: CONFIDENCE_COLOR(confidenceScore) + '20' }]}>
-                  <Text style={[st.badgeText, { color: CONFIDENCE_COLOR(confidenceScore) }]}>{confidenceScore}%</Text>
-                </View>
-              )}
+            <View>
+              <Text style={st.headerTitle}>Speech to Text</Text>
+              <Text style={st.headerSub}>{englishText ? 'Transcript ready to edit' : 'Ready to start'}</Text>
             </View>
-            <TextInput style={st.outputText} value={activeText} onChangeText={(t) => { if (mode === 'transcript') setField('englishText', t); }} multiline editable={mode === 'transcript'} />
-            <View style={st.outputFooter}>
-              <Text style={st.countText}>{wordCount} words · {charCount} chars</Text>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity onPress={handleCopy}>
-                  <Text style={st.actionBtn}>{copied ? '✓ Copied' : '📋 Copy'}</Text>
+          </View>
+          <Text style={st.versionBadge}>v2.5</Text>
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 20 }]} showsVerticalScrollIndicator={false}>
+
+
+          {/* Toolbar */}
+          {englishText ? (
+            <View style={st.toolbar}>
+              <TouchableOpacity style={st.toolBtn} onPress={handleTranslate} disabled={translating}>
+                <Text style={st.toolBtnText}>{translating ? 'Translating...' : 'Translate'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[st.toolBtn, { backgroundColor: COLORS.surface }]} onPress={() => setShowTonePicker(!showTonePicker)}>
+                <Text style={[st.toolBtnText, { color: COLORS.ink }]}>{selectedTone || 'Retone'}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {showTonePicker && (
+            <View style={st.pickerDrop}>
+              {TONES.map((t) => (
+                <TouchableOpacity key={t} style={st.pickerItem} onPress={() => handleRetone(t)}>
+                  <Text style={st.pickerText}>{t}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleClear}>
-                  <Text style={[st.actionBtn, { color: COLORS.redSoft }]}>🗑 Clear</Text>
+              ))}
+            </View>
+          )}
+
+          {/* Mode tabs */}
+          {englishText ? (
+            <View style={st.modeTabs}>
+              {['transcript', 'retoned', 'translation'].map((m) => (
+                <TouchableOpacity key={m} style={[st.modeTab, mode === m && st.modeTabActive]} onPress={() => setMode(m)} disabled={m === 'retoned' && !rewrittenText || m === 'translation' && !nativeTranslation}>
+                  <Text style={[st.modeTabText, mode === m && st.modeTabTextActive]}>{m.charAt(0).toUpperCase() + m.slice(1)}</Text>
                 </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Output */}
+          {transcribing ? (
+            <View style={st.emptyState}>
+              <ActivityIndicator size="large" color={COLORS.saffron} />
+              <Text style={st.emptyText}>Transcribing audio...</Text>
+            </View>
+          ) : retoning ? (
+            <View style={st.emptyState}>
+              <ActivityIndicator size="large" color={COLORS.saffron} />
+              <Text style={st.emptyText}>Shaping your message...</Text>
+            </View>
+          ) : activeText ? (
+            <View style={st.outputCard}>
+              <View style={st.outputHeader}>
+                <Text style={st.outputLabel}>{mode === 'translation' ? 'Translation' : mode === 'retoned' ? 'Retoned' : 'Transcript'}</Text>
+                {confidenceScore != null && mode === 'transcript' && (
+                  <View style={[st.badge, { backgroundColor: CONFIDENCE_COLOR(confidenceScore) + '20' }]}>
+                    <Text style={[st.badgeText, { color: CONFIDENCE_COLOR(confidenceScore) }]}>{confidenceScore}%</Text>
+                  </View>
+                )}
+              </View>
+              <TextInput style={st.outputText} value={activeText} onChangeText={(t) => { if (mode === 'transcript') setField('englishText', t); }} multiline editable={mode === 'transcript'} />
+              <View style={st.outputFooter}>
+                <Text style={st.countText}>{wordCount} words · {charCount} chars</Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={handleCopy}>
+                    <Text style={st.actionBtn}>{copied ? '✓ Copied' : '📋 Copy'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleClear}>
+                    <Text style={[st.actionBtn, { color: COLORS.redSoft }]}>🗑 Clear</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        ) : (
-          <View style={st.emptyState}>
-            <View style={st.micCircle}>
-              <Text style={{ fontSize: 36 }}>🎙️</Text>
+          ) : (
+            <View style={st.emptyState}>
+              <View style={st.micCircle}>
+                <Text style={{ fontSize: 36 }}>🎙️</Text>
+              </View>
+              <Text style={st.emptyText}>Press Start Speaking to begin</Text>
+              <Text style={st.emptySubtext}>Record audio to get English transcript instantly</Text>
             </View>
-            <Text style={st.emptyText}>Press Start Speaking to begin</Text>
-            <Text style={st.emptySubtext}>Record audio to get English transcript instantly</Text>
-          </View>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
 
-      {/* Recording Controls */}
-      <View style={[st.recordBar, { paddingBottom: insets.bottom + 20 }]}>
-        {isRecording ? (
-          <View style={st.recordingRow}>
-            <View style={st.timerBox}>
-              <View style={st.redDot} />
-              <Text style={st.timerText}>{fmtTime}</Text>
+        {/* Recording Controls */}
+        <View style={[st.recordBar, { paddingBottom: insets.bottom + 20 }]}>
+          {isRecording ? (
+            <View style={st.recordingRow}>
+              <View style={st.timerBox}>
+                <View style={st.redDot} />
+                <Text style={st.timerText}>{fmtTime}</Text>
+              </View>
+              <TouchableOpacity style={st.stopBtn} onPress={stopRecording}>
+                <Text style={st.stopBtnText}>⏹ Stop</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={st.stopBtn} onPress={stopRecording}>
-              <Text style={st.stopBtnText}>⏹ Stop</Text>
+          ) : (
+            <TouchableOpacity style={st.startBtn} onPress={startRecording} disabled={transcribing}>
+              <Text style={st.startBtnText}>🎙 Start Speaking</Text>
             </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity style={st.startBtn} onPress={startRecording} disabled={transcribing}>
-            <Text style={st.startBtnText}>🎙 Start Speaking</Text>
-          </TouchableOpacity>
-        )}
+          )}
+        </View>
       </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
+
 
 const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
