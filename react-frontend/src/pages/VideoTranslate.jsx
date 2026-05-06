@@ -97,7 +97,7 @@ export default function VideoTranslate() {
   };
 
   const [vttBlobUrl, setVttBlobUrl] = useState(null);
-  const BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
+  const BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
   // Fetch VTT as blob URL when result is ready (solves CORS for <track>)
   useEffect(() => {

@@ -1066,7 +1066,7 @@ async function extStopMic() {
   try {
     const formData = new FormData();
     formData.append('file', blob, 'recording.webm');
-    const res = await fetch('http://127.0.0.1:8001/api/translate-audio', { method: 'POST', body: formData });
+    const res = await fetch('http://127.0.0.1:8000/api/translate-audio', { method: 'POST', body: formData });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     extRawText = data.transcript || '';
@@ -1110,7 +1110,7 @@ async function extApplyTone(tone) {
       return;
     }
 
-    const r = await fetch('http://127.0.0.1:8001/api/rewrite-tone', {
+    const r = await fetch('http://127.0.0.1:8000/api/rewrite-tone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, tone: backendTone, user_override: userOverride }),
@@ -1713,7 +1713,7 @@ function showToast(msg) {
 }
 
 // ========== WIDGET FILL BRIDGE ==========
-const WIDGET_FILL_API = 'http://127.0.0.1:8001/api/widget-fill';
+const WIDGET_FILL_API = 'http://127.0.0.1:8000/api/widget-fill';
 let _fillPollInterval = null;
 
 function startWidgetFillPolling() {
