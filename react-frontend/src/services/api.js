@@ -164,10 +164,10 @@ export const advancedTranslate = async (text, targetLanguage, glossary = null) =
   return data; // { detected_language, domain, tone, has_slang, jargon_terms, final_translation, confidence_score }
 };
 
-export const textToSpeech = async (text, language, speaker = 'meera') => {
+export const textToSpeech = async (text, language, speaker = 'meera', useSarvam = true) => {
   const { data } = await API.post(
     '/text-to-speech',
-    { text, language, use_sarvam: true, speaker },
+    { text, language, use_sarvam: useSarvam, speaker },
     { responseType: 'blob' }
   );
   return data;
@@ -409,9 +409,32 @@ export const diarizeAudio = async (blob, filename = 'recording.webm', speakerCou
   return data;
 };
 
-export const synthesizeConversation = async ({ segments, target_language }) => {
-  const { data } = await API.post('/synthesize-conversation', { segments, target_language }, {
+export const synthesizeConversation = async ({ segments, target_language, cloned_voice_id, speaker_voices }) => {
+  const { data } = await API.post('/synthesize-conversation', { segments, target_language, cloned_voice_id, speaker_voices }, {
     timeout: 180000,
   });
   return data; // { segments: [{speaker, audio (base64), emotion}] }
+};
+
+export const cloneVoice = async (audioBlob) => {
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'sample.webm');
+  const { data } = await API.post('/clone-voice', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+  return data; // { voice_id }
+};
+
+export const diarizeAndClone = async (audioBlob, transcript) => {
+  const formData = new FormData();
+  if (audioBlob && audioBlob.size > 0) {
+    formData.append('file', audioBlob, 'session.webm');
+  }
+  formData.append('transcript', transcript);
+  const { data } = await API.post('/diarize-and-clone', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000,
+  });
+  return data; // { segments, speaker_voices, speaker_count, method }
 };

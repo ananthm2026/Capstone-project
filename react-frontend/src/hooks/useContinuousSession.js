@@ -1,13 +1,11 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import * as api from '../services/api';
 
 const CHUNK_MS = 5000;
 
-// ── Module-level singleton — survives component unmount/remount ───────────────
 const _session = {
-  state: 'idle',        // idle | listening | paused | ended
+  state: 'idle',   // idle | listening | paused | ended
   lines: [],
-  segments: [],
   targetLang: localStorage.getItem('defaultLanguage') || 'hi-IN',
   stream: null,
   audioCtx: null,
@@ -25,7 +23,7 @@ function notify() {
 
 function stopMicHard() {
   if (_session.mediaRecorder?.state === 'recording') {
-    _session.mediaRecorder.onstop = null; // prevent stale chunk processing
+    _session.mediaRecorder.onstop = null;
     _session.mediaRecorder.stop();
   }
   _session.stream?.getTracks().forEach(t => t.stop());
@@ -45,7 +43,7 @@ async function processChunk(blob, incrementUsage) {
   _session.lines = [..._session.lines, { id, text: '', translation: '', processing: true }];
   notify();
   try {
-    const stt = await api.translateAudioFromBlob(blob, 'chunk.webm');
+    const stt  = await api.translateAudioFromBlob(blob, 'chunk.webm');
     const text = stt.transcript?.trim();
     if (!text) {
       _session.lines = _session.lines.filter(l => l.id !== id);
@@ -53,13 +51,12 @@ async function processChunk(blob, incrementUsage) {
       return;
     }
     let translation = text;
-    // Only translate if target lang is not English
     if (_session.targetLang && _session.targetLang !== 'en-IN' && _session.targetLang !== 'en') {
       try {
         translation = await api.translateText(text, _session.targetLang);
       } catch (e) {
-        console.warn('[session] translation failed, showing original:', e?.response?.data?.detail || e.message);
-        translation = text; // fallback to original
+        console.warn('[session] translation failed:', e?.response?.data?.detail || e.message);
+        translation = text;
       }
     }
     _session.lines = _session.lines.map(l =>
@@ -67,7 +64,7 @@ async function processChunk(blob, incrementUsage) {
     );
     incrementUsage?.('sarvamCalls');
   } catch (e) {
-    console.error('[session] chunk processing failed:', e?.response?.data?.detail || e.message);
+    console.error('[session] chunk failed:', e?.response?.data?.detail || e.message);
     _session.lines = _session.lines.filter(l => l.id !== id);
   }
   notify();
@@ -133,7 +130,10 @@ export async function sessionResume(incrementUsage) {
 }
 
 export function sessionPause() {
-  if (_session.mediaRecorder?.state === 'recording') _session.mediaRecorder.stop();
+  if (_session.mediaRecorder?.state === 'recording') {
+    _session.mediaRecorder.onstop = null;
+    _session.mediaRecorder.stop();
+  }
   clearInterval(_session.chunkTimer);
   cancelAnimationFrame(_session.animFrame);
   _session.stream?.getTracks().forEach(t => t.stop());
@@ -143,27 +143,16 @@ export function sessionPause() {
   notify();
 }
 
-export async function sessionEnd(showError) {
+export function sessionEnd() {
   stopMicHard();
   _session.state = 'ended';
   notify();
-  const combinedTranscript = _session.lines
-    .filter(l => !l.processing && l.text).map(l => l.text).join(' ');
-  if (!combinedTranscript.trim()) return;
-  try {
-    const result = await api.diarizeAudio(null, 'session.webm', 0, combinedTranscript);
-    _session.segments = result.segments || [];
-    notify();
-  } catch (e) {
-    showError?.(e.response?.data?.detail || 'Speaker detection failed');
-  }
 }
 
 export function sessionClear() {
   stopMicHard();
   _session.state = 'idle';
   _session.lines = [];
-  _session.segments = [];
   _session.amplitude = 0;
   notify();
 }
@@ -176,20 +165,14 @@ export function getSessionSnapshot() {
   return { ..._session };
 }
 
-// ── React hook — subscribes to singleton, survives navigation ─────────────────
 export function useContinuousSession() {
   const [snap, setSnap] = useState(() => ({ ..._session }));
-  const ampRef = useRef(0);
 
   useEffect(() => {
     const handler = (s) => setSnap({ ...s });
     _session.listeners.add(handler);
-    // Sync immediately on mount (in case session is already running)
     setSnap({ ..._session });
-    return () => {
-      _session.listeners.delete(handler);
-      // Do NOT stop the session on unmount — that's the whole point
-    };
+    return () => { _session.listeners.delete(handler); };
   }, []);
 
   return snap;

@@ -54,7 +54,7 @@ export default function AppHome() {
     { icon: Ear,      title: L.continuousListening, desc: L.continuousListeningDesc, path: '/app/continuous' },
     { icon: Globe,    title: L.englishToNative,     desc: L.englishToNativeDesc,     path: '/app/english-to-native' },
     { icon: ScanText, title: L.visionTranslate,     desc: L.visionTranslateDesc,     path: '/app/vision' },
-    { icon: Video,    title: 'Video Translate',     desc: 'Upload a video and get translated speech back.', path: '/app/video' },
+    { icon: Video,    title: 'Video Subtitles',     desc: 'Upload a video and get subtitles in your language.', path: '/app/video' },
   ];
 
   const go = (path) => { clearAll(); navigate(path); };

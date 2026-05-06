@@ -114,18 +114,17 @@ def text_to_speech_sarvam(text: str, language: str = "en-IN", speaker_gender: st
     if not SARVAM_API_KEY:
         raise Exception("SARVAM_API_KEY is not set")
 
-    # Sarvam confirmed available speakers (from API error message)
-    # Female: anushka, manisha, vidya, arya, ritu, priya, neha, pooja, simran, kavya
-    # Male: abhilash, karun, hitesh, aditya, rahul, rohan
-    FEMALE_SPEAKERS = {"default": "anushka"}
-    MALE_SPEAKERS   = {"default": "abhilash"}
+    VALID_SPEAKERS = {"abhilash", "karun", "hitesh", "aditya", "rahul", "rohan", "anushka", "manisha", "vidya", "arya", "priya", "neha", "ritu", "pooja", "simran", "kavya"}
+    speaker = speaker_gender if speaker_gender.lower() in VALID_SPEAKERS else "anushka"
 
-    is_female = speaker_gender.lower() in ("female", "f")
-    speaker = FEMALE_SPEAKERS["default"] if is_female else MALE_SPEAKERS["default"]
+    import base64, wave, io
 
     # Split text into chunks ≤500 chars (Sarvam limit)
     chunks = [text[i:i+500] for i in range(0, len(text), 500)]
-    all_audio = b""
+    wav_frames = []
+    wav_params = None
+
+    headers = {"api-subscription-key": SARVAM_API_KEY, "Content-Type": "application/json"}
 
     for chunk in chunks:
         if not chunk.strip():
@@ -141,31 +140,42 @@ def text_to_speech_sarvam(text: str, language: str = "en-IN", speaker_gender: st
             "enable_preprocessing": True,
             "model": "bulbul:v2",
         }
-        headers = {"api-subscription-key": SARVAM_API_KEY, "Content-Type": "application/json"}
         logger.info(f"[sarvam-tts] lang={language}, speaker={speaker}, chunk={len(chunk)}chars")
         resp = requests.post("https://api.sarvam.ai/text-to-speech", json=payload, headers=headers, timeout=30)
 
         if resp.status_code != 200:
-            payload["model"] = "bulbul:v1"
-            resp = requests.post("https://api.sarvam.ai/text-to-speech", json=payload, headers=headers, timeout=30)
+            v3_payload = {
+                "inputs": [chunk],
+                "target_language_code": language,
+                "speaker": speaker,
+                "pace": 1.0,
+                "speech_sample_rate": 22050,
+                "enable_preprocessing": True,
+                "model": "bulbul:v3",
+            }
+            resp = requests.post("https://api.sarvam.ai/text-to-speech", json=v3_payload, headers=headers, timeout=30)
 
         if resp.status_code == 200:
-            import base64
             data = resp.json()
             audios = data.get("audios", [])
-            if audios:
-                all_audio += base64.b64decode(audios[0])
-            else:
+            if not audios:
                 raise Exception(f"Sarvam TTS: no audio in response: {data}")
+            wav_bytes = base64.b64decode(audios[0])
+            with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
+                if wav_params is None:
+                    wav_params = wf.getparams()
+                wav_frames.append(wf.readframes(wf.getnframes()))
         else:
             raise Exception(f"Sarvam TTS {resp.status_code}: {resp.text[:200]}")
 
-    if not all_audio:
+    if not wav_frames:
         raise Exception("Sarvam TTS: no audio generated")
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-    tmp.write(all_audio)
-    tmp.close()
+    with wave.open(tmp.name, 'wb') as out_wf:
+        out_wf.setparams(wav_params)
+        for frames in wav_frames:
+            out_wf.writeframes(frames)
     logger.info(f"[sarvam-tts] Generated: {tmp.name}")
     return tmp.name
 

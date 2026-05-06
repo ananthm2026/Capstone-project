@@ -593,10 +593,10 @@ ORIGINAL TEXT:
 REWRITTEN OUTPUT:"""
 
     logger.info(f"Gemini rewrite request: tone='{tone_option}', text='{text[:80]}'")
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(prompt, request_options={"timeout": 30})
         logger.info("Gemini rewrite response received.")
         result = (response.text or "").strip()
         if not result:

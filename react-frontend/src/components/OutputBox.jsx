@@ -16,7 +16,7 @@ export default function OutputBox({ label, content, language, type }) {
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
       setField(playingKey, true);
       setLoading('Generating speech...');
-      const blob = await api.textToSpeech(content, language);
+      const blob = await api.textToSpeech(content, language, state.selectedSarvamVoice || 'meera');
       setLoading(null);
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);

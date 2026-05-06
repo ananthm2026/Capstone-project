@@ -1,61 +1,43 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import * as api from '../services/api';
 
 export function useSpeech() {
   const { state, setField } = useApp();
+  const audioRef = useRef(null);
   const isPlaying = state.isSpeaking ?? false;
 
-  const speak = useCallback((text, langOverride) => {
+  const speak = useCallback(async (text, langOverride) => {
     if (!text?.trim()) return;
 
-    // If currently playing, stop it
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+    // Toggle off if already playing
+    if (isPlaying) {
+      audioRef.current?.pause();
+      audioRef.current = null;
       setField('isSpeaking', false);
       return;
     }
 
-    const lang = langOverride || state.selectedLanguage || 'en-IN';
+    const lang    = langOverride || state.selectedLanguage || 'hi-IN';
+    const speaker = state.selectedSarvamVoice || 'meera';
 
-    const doSpeak = (voices) => {
-      const langPrefix = lang.split('-')[0];
-      let voice = null;
-
-      if (state.selectedVoice) {
-        voice = voices.find(v => v.voiceURI === state.selectedVoice);
-      }
-      if (!voice) {
-        voice = voices.find(v => v.lang === lang)
-             || voices.find(v => v.lang.startsWith(langPrefix));
-      }
-
-      const utter = new SpeechSynthesisUtterance(text);
-      if (voice) utter.voice = voice;
-      utter.lang = lang;
-      utter.rate = 0.95;
-      utter.pitch = 1;
-
-      utter.onstart = () => setField('isSpeaking', true);
-      utter.onend   = () => setField('isSpeaking', false);
-      utter.onerror = () => setField('isSpeaking', false);
-
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utter);
-    };
-
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      doSpeak(voices);
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => {
-        doSpeak(window.speechSynthesis.getVoices());
-        window.speechSynthesis.onvoiceschanged = null;
-      };
+    setField('isSpeaking', true);
+    try {
+      const blob  = await api.textToSpeech(text, lang, speaker);
+      const url   = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setField('isSpeaking', false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setField('isSpeaking', false); URL.revokeObjectURL(url); };
+      audio.play();
+    } catch {
+      setField('isSpeaking', false);
     }
-  }, [state.selectedVoice, state.selectedLanguage, setField]);
+  }, [isPlaying, state.selectedLanguage, state.selectedSarvamVoice, setField]);
 
   const stop = useCallback(() => {
-    window.speechSynthesis.cancel();
+    audioRef.current?.pause();
+    audioRef.current = null;
     setField('isSpeaking', false);
   }, [setField]);
 

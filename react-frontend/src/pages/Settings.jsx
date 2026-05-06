@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { RefreshCw, Database, Trash2, Zap, BarChart2, Moon, Sun, Globe, X, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Database, Trash2, Zap, BarChart2, Moon, Sun, Globe, X, ShieldCheck, Volume2, Play } from 'lucide-react';
 import * as api from '../services/api';
 import { getLabels } from '../services/uiLabels';
 
@@ -34,8 +34,13 @@ function Toggle({ on, onToggle, disabled }) {
   );
 }
 
+const SARVAM_VOICES = [
+  'abhilash', 'karun', 'hitesh', 'aditya', 'rahul', 'rohan',
+  'anushka', 'manisha', 'vidya', 'arya', 'priya', 'neha', 'ritu', 'pooja', 'simran', 'kavya',
+];
+
 export default function Settings() {
-  const { state, toggleDark, setUiLanguage } = useApp();
+  const { state, toggleDark, setUiLanguage, setField } = useApp();
   const L = getLabels(state.uiLanguage);
 
   const [cacheStats, setCacheStats] = useState(null);
@@ -43,6 +48,8 @@ export default function Settings() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [consentGiven, setConsentGiven] = useState(state.authUser?.consentGiven ?? false);
   const [consentSaving, setConsentSaving] = useState(false);
+  const [previewingVoice, setPreviewingVoice] = useState(null);
+  const previewAudioRef = useState(null);
 
   const loadCache = async () => { try { setCacheStats(await api.getCacheStats()); } catch {} };
   useEffect(() => { loadCache(); }, []);
@@ -72,6 +79,21 @@ export default function Settings() {
 
   const hitRate = cacheStats && cacheStats.total_entries > 0
     ? Math.round((cacheStats.total_hits / (cacheStats.total_hits + cacheStats.total_entries)) * 100) : 0;
+
+  const handlePreviewVoice = async (voiceId) => {
+    if (previewAudioRef[0]) { previewAudioRef[0].pause(); previewAudioRef[0] = null; }
+    if (previewingVoice === voiceId) { setPreviewingVoice(null); return; }
+    setPreviewingVoice(voiceId);
+    try {
+      const blob = await api.textToSpeech('Hello, this is a voice preview.', state.selectedLanguage || 'hi-IN', voiceId);
+      const url  = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      previewAudioRef[0] = audio;
+      audio.onended = () => { setPreviewingVoice(null); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setPreviewingVoice(null); };
+      audio.play();
+    } catch { setPreviewingVoice(null); }
+  };
 
   return (
     <div className="min-h-screen bg-[var(--bg)] px-4 md:px-10 pt-6 md:pt-10 pb-10 md:pb-16 max-w-3xl mx-auto">
@@ -153,6 +175,45 @@ export default function Settings() {
               )}
             </>
           )}
+        </div>
+
+        {/* Default Voice */}
+        <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+              <Volume2 className="w-4 h-4 text-gray-600" />
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-gray-900">Default Voice</p>
+              <p className="text-[12px] text-gray-400 mt-0.5">Used across all Speak buttons — English to Native, Continuous Listening, and more</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {SARVAM_VOICES.map(v => {
+              const isSelected = (state.selectedSarvamVoice || 'meera') === v;
+              const isPreviewing = previewingVoice === v;
+              return (
+                <div key={v}
+                  onClick={() => setField('selectedSarvamVoice', v)}
+                  className={`relative flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    isSelected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-100 bg-gray-50 text-gray-700 hover:border-gray-300'
+                  }`}>
+                  <span className="text-[13px] font-semibold capitalize">{v}</span>
+                  {isSelected && <span className="text-[9px] font-bold opacity-60">✓ active</span>}
+                  <button
+                    onClick={e => { e.stopPropagation(); handlePreviewVoice(v); }}
+                    className={`absolute top-2 right-2 p-1 rounded-full transition-all ${
+                      isSelected ? 'text-white/60 hover:text-white hover:bg-white/20' : 'text-gray-300 hover:text-gray-600 hover:bg-gray-200'
+                    }`}
+                    title="Preview">
+                    {isPreviewing
+                      ? <span className="w-3 h-3 block rounded-sm bg-current" />
+                      : <Play className="w-3 h-3" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* App Language */}

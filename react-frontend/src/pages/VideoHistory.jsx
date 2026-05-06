@@ -45,9 +45,9 @@ export default function VideoHistory() {
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-ink)', letterSpacing: '-0.03em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
             <Clock className="w-5 h-5" style={{ color: 'var(--saffron)' }} />
-            Video History
+            Subtitle History
           </h2>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-faded)', marginTop: 2, margin: 0 }}>{history.length} translated video{history.length !== 1 ? 's' : ''}</p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-faded)', marginTop: 2, margin: 0 }}>{history.length} subtitled video{history.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
 

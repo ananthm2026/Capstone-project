@@ -61,6 +61,7 @@ const initialState = {
   customTone: '',
   selectedLanguage: localStorage.getItem('defaultLanguage') || 'hi-IN',
   selectedVoice: null,
+  selectedSarvamVoice: localStorage.getItem('selectedSarvamVoice') || 'meera',
   isSpeaking: false,
   isPlayingEnglish: false,
   isPlayingRewritten: false,
@@ -99,6 +100,9 @@ function reducer(state, action) {
     case 'SET_FIELD':
       if (action.field === 'selectedLanguage') {
         localStorage.setItem('defaultLanguage', action.value);
+      }
+      if (action.field === 'selectedSarvamVoice') {
+        localStorage.setItem('selectedSarvamVoice', action.value);
       }
       return { ...state, [action.field]: action.value };
     case 'SET_FIELDS':

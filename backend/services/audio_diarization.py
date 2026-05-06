@@ -140,7 +140,7 @@ def _cosine_similarity(a, b):
     return float(np.dot(a, b) / (norm_a * norm_b))
 
 
-def _cluster_speakers(seg_features: list[dict], similarity_threshold=0.92) -> list[int]:
+def _cluster_speakers(seg_features: list[dict], similarity_threshold=0.96) -> list[int]:
     """
     Cluster segments into speakers using MFCC cosine similarity.
     Returns list of speaker IDs (0-indexed) for each segment.
@@ -391,3 +391,55 @@ Transcript:
             "voice":   voice,
         })
     return results
+
+
+def extract_speaker_audio_samples(audio_path: str, segments: list[dict]) -> dict:
+    """
+    Extract and concatenate audio per speaker using segment timing.
+    Returns { "Person 1": "/tmp/xxx.wav", "Person 2": "/tmp/yyy.wav" }
+    """
+    try:
+        import librosa
+        import soundfile as sf
+        import numpy as np
+        from collections import defaultdict
+    except ImportError:
+        logger.warning("[audio_diarize] soundfile not installed, skipping extraction")
+        return {}
+
+    try:
+        y, sr = librosa.load(audio_path, sr=16000, mono=True)
+        duration = len(y) / sr
+
+        speaker_chunks = defaultdict(list)
+        for seg in segments:
+            spk = seg.get("speaker", "Person 1")
+            start = float(seg.get("start", 0))
+            end   = float(seg.get("end", 0))
+            if end <= start:
+                end = min(start + 5.0, duration)
+            end = min(end, duration)
+            s_samp = int(start * sr)
+            e_samp = int(end   * sr)
+            if e_samp > s_samp:
+                speaker_chunks[spk].append(y[s_samp:e_samp])
+
+        result = {}
+        for spk, chunks in speaker_chunks.items():
+            if not chunks:
+                continue
+            combined = np.concatenate(chunks)
+            if len(combined) / sr < 2.0:   # need ≥2s
+                continue
+            combined = combined[:int(30 * sr)]   # cap at 30s
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+            sf.write(tmp.name, combined, sr)
+            tmp.close()
+            result[spk] = tmp.name
+            logger.info(f"[audio_diarize] Extracted {len(combined)/sr:.1f}s for {spk} → {tmp.name}")
+
+        return result
+    except Exception as e:
+        logger.error(f"[audio_diarize] extract_speaker_audio_samples failed: {e}")
+        return {}

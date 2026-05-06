@@ -7,116 +7,128 @@ import {
   sessionClear, sessionSetLang,
 } from '../hooks/useContinuousSession';
 import {
-  Mic, Square, Loader2, Pause, Play,
-  Volume2, ChevronDown, StopCircle
+  Mic, Square, Loader2, Pause, Play, Volume2, ChevronDown, StopCircle
 } from 'lucide-react';
 
 const CHUNK_MS = 5000;
-
-const SPEAKER_COLORS = [
-  { bg: 'bg-violet-500',  light: 'bg-violet-50 text-violet-900',  text: 'text-violet-500'  },
-  { bg: 'bg-sky-500',     light: 'bg-sky-50 text-sky-900',        text: 'text-sky-500'     },
-  { bg: 'bg-emerald-500', light: 'bg-emerald-50 text-emerald-900',text: 'text-emerald-500' },
-  { bg: 'bg-amber-500',   light: 'bg-amber-50 text-amber-900',    text: 'text-amber-500'   },
-  { bg: 'bg-rose-500',    light: 'bg-rose-50 text-rose-900',      text: 'text-rose-500'    },
-];
-
 const LANGS = [['Hindi','hi-IN'],['Kannada','kn-IN'],['Tamil','ta-IN'],['Telugu','te-IN'],['Malayalam','ml-IN'],['Bengali','bn-IN'],['English','en-IN']];
+const MALE_VOICES = ['abhilash','karun','arvind','amol'];
 
 export default function ContinuousListening() {
   const { state, showError, incrementUsage } = useApp();
 
-  // Singleton session state — persists across navigation
   const session = useContinuousSession();
-  const { state: sessionState, lines, segments, amplitude, targetLang } = session;
+  const { state: sessionState, lines, amplitude, targetLang } = session;
 
-  // Sync default language into the session when it changes in Profile
   useEffect(() => {
     if (sessionState === 'idle') sessionSetLang(state.selectedLanguage);
   }, [state.selectedLanguage]);
 
-  const [isDiarizing,    setIsDiarizing]    = useState(false);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [synthSegments,  setSynthSegments]  = useState([]);
+  const [synthLines,     setSynthLines]     = useState([]);
   const [playingIdx,     setPlayingIdx]     = useState(null);
+  const [speakingLineId, setSpeakingLineId] = useState(null);
   const audioRef  = useRef(null);
   const boxEndRef = useRef(null);
-
-  useEffect(() => { boxEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [lines, segments]);
-
-  const handleStart = useCallback(async () => {
-    try { await sessionStart(incrementUsage); }
-    catch { showError('Microphone access denied'); }
-  }, [incrementUsage, showError]);
-
-  const handlePause = useCallback(() => sessionPause(), []);
-
-  const handleResume = useCallback(async () => {
-    try { await sessionResume(incrementUsage); }
-    catch { showError('Microphone access denied'); }
-  }, [incrementUsage, showError]);
-
-  const handleEnd = useCallback(async () => {
-    setIsDiarizing(true);
-    await sessionEnd(showError);
-    setIsDiarizing(false);
-  }, [showError]);
-
-  const handleClear = useCallback(() => {
-    sessionClear();
-    setSynthSegments([]);
-    setPlayingIdx(null);
-  }, []);
-
-  const handleLangChange = useCallback((lang) => {
-    sessionSetLang(lang);
-  }, []);
-
-  const handleSynthesize = async () => {
-    const src = segments.length > 0 ? segments : lines.filter(l => !l.processing && l.text);
-    if (!src.length) return;
-    setIsSynthesizing(true); setSynthSegments([]);
-    try {
-      const mapped = src.map(s => ({
-        speaker: s.speaker || 'Person 1', text: s.text,
-        translated_text: s.translation || s.text, emotion: s.emotion || 'neutral',
-        voice: s.voice || { sarvam: s.gender === 'female' ? 'anushka' : 'abhilash', gtts_gender: s.gender || 'male' },
-      }));
-      const result = await api.synthesizeConversation({ segments: mapped, target_language: targetLang });
-      setSynthSegments(result.segments || []);
-    } catch (e) { showError(e.response?.data?.detail || 'Synthesis failed'); }
-    finally { setIsSynthesizing(false); }
-  };
-
-  const playSegment = (idx) => {
-    const seg = synthSegments[idx];
-    if (!seg?.audio) return;
-    audioRef.current?.pause();
-    const audio = new Audio(`data:audio/wav;base64,${seg.audio}`);
-    audioRef.current = audio;
-    setPlayingIdx(idx);
-    audio.onended = () => { setPlayingIdx(null); if (idx + 1 < synthSegments.length) playSegment(idx + 1); };
-    audio.play();
-  };
-  const stopPlayback = () => { audioRef.current?.pause(); audioRef.current = null; setPlayingIdx(null); };
 
   const isActive = sessionState === 'listening';
   const isPaused = sessionState === 'paused';
   const isEnded  = sessionState === 'ended';
   const isIdle   = sessionState === 'idle';
 
-  const displayItems   = isEnded && segments.length > 0 ? segments : lines;
-  const uniqueSpeakers = [...new Set((isEnded && segments.length > 0 ? segments : []).map(s => s.speaker).filter(Boolean))];
+  const canGenerate = isEnded && lines.filter(l => !l.processing && l.text).length > 0;
+
+  useEffect(() => { boxEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [lines]);
+
+  const handleStart = useCallback(async () => {
+    try { await sessionStart(incrementUsage); }
+    catch { showError('Microphone access denied'); }
+  }, [incrementUsage, showError]);
+
+  const handlePause  = useCallback(() => sessionPause(), []);
+
+  const handleResume = useCallback(async () => {
+    try { await sessionResume(incrementUsage); }
+    catch { showError('Microphone access denied'); }
+  }, [incrementUsage, showError]);
+
+  const handleEnd    = useCallback(() => sessionEnd(), []);
+
+  const handleClear  = useCallback(() => {
+    sessionClear();
+    setSynthLines([]);
+    setPlayingIdx(null);
+  }, []);
+
+  const handleLangChange = useCallback((lang) => sessionSetLang(lang), []);
+
+  const lineAudioRef = useRef(null);
+
+  const handleSpeakLine = useCallback(async (item) => {
+    if (speakingLineId === item.id) {
+      lineAudioRef.current?.pause();
+      lineAudioRef.current = null;
+      setSpeakingLineId(null);
+      return;
+    }
+    lineAudioRef.current?.pause();
+    lineAudioRef.current = null;
+    setSpeakingLineId(item.id);
+    try {
+      const voice = state.selectedSarvamVoice || 'anushka';
+      const blob = await api.textToSpeech(item.text, 'en-IN', voice, true);
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      lineAudioRef.current = audio;
+      audio.onended = () => { setSpeakingLineId(null); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setSpeakingLineId(null); URL.revokeObjectURL(url); };
+      audio.play();
+    } catch { setSpeakingLineId(null); }
+  }, [speakingLineId]);
+
+  const handleSynthesize = async () => {
+    const src = lines.filter(l => !l.processing && l.text);
+    if (!src.length) return;
+    setIsSynthesizing(true); setSynthLines([]);
+    try {
+      const voice  = state.selectedSarvamVoice || 'anushka';
+      const gender = MALE_VOICES.includes(voice) ? 'male' : 'female';
+      const mapped = src.map(l => ({
+        speaker:         'Person 1',
+        text:            l.text,
+        translated_text: l.text,
+        emotion:         'neutral',
+        voice:           { sarvam: voice, gtts_gender: gender },
+      }));
+      const result = await api.synthesizeConversation({ segments: mapped, target_language: 'en-IN' });
+      setSynthLines(result.segments || []);
+    } catch (e) { showError(e.response?.data?.detail || 'Synthesis failed'); }
+    finally { setIsSynthesizing(false); }
+  };
+
+  const playSegment = (idx) => {
+    const seg = synthLines[idx];
+    if (!seg?.audio) return;
+    audioRef.current?.pause();
+    const audio = new Audio(`data:audio/wav;base64,${seg.audio}`);
+    audioRef.current = audio;
+    setPlayingIdx(idx);
+    audio.onended = () => { setPlayingIdx(null); if (idx + 1 < synthLines.length) playSegment(idx + 1); };
+    audio.play();
+  };
+  const stopPlayback = () => { audioRef.current?.pause(); audioRef.current = null; setPlayingIdx(null); };
 
   const bars = Array.from({ length: 32 }, (_, i) =>
     isActive ? Math.max(3, Math.min(28, amplitude * (0.35 + Math.sin(i * 0.9) * 0.35))) : 3
   );
 
+  const voiceName = state.selectedSarvamVoice || 'meera';
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
 
       {/* ── Top bar ── */}
-      <div style={{ display: 'flex', alignItems:'center', justifyContent: 'space-between', padding: '12px 20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 44, height: 44, borderRadius: '50%', background: isActive ? '#EF4444' : 'var(--surface-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: isActive ? '0 4px 12px rgba(239,68,68,0.3)' : 'none', transition: 'all 0.2s' }}>
             <Mic style={{ width: 20, height: 20, color: '#fff' }} />
@@ -131,6 +143,7 @@ export default function ContinuousListening() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Language */}
           <div style={{ position: 'relative' }}>
             <select value={targetLang} onChange={e => handleLangChange(e.target.value)} disabled={isActive}
               style={{ appearance: 'none', background: 'var(--surface)', border: '1px solid var(--border-warm)', borderRadius: 'var(--r-pill)', padding: '8px 32px 8px 16px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-ink)', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', opacity: isActive ? 0.5 : 1 }}>
@@ -138,13 +151,21 @@ export default function ContinuousListening() {
             </select>
             <ChevronDown style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: 'var(--text-faded)', pointerEvents: 'none' }} />
           </div>
-          {isEnded && displayItems.filter(d => !d.processing).length > 0 && (
+
+          {/* Active voice badge */}
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-faded)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-pill)', padding: '6px 12px', fontWeight: 600 }}>
+            {voiceName}
+          </span>
+
+          {canGenerate && (
             <>
               <button onClick={handleSynthesize} disabled={isSynthesizing}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: 'var(--surface-ink)', color: '#fff', borderRadius: 'var(--r-pill)', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer', opacity: isSynthesizing ? 0.5 : 1 }}>
-                {isSynthesizing ? <><Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />Generating…</> : <><Volume2 style={{ width: 12, height: 12 }} />Generate voices</>}
+                {isSynthesizing
+                  ? <><Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />Generating…</>
+                  : <><Volume2 style={{ width: 12, height: 12 }} />Generate voices</>}
               </button>
-              {synthSegments.length > 0 && (
+              {synthLines.length > 0 && (
                 <button onClick={() => playingIdx !== null ? stopPlayback() : playSegment(0)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: playingIdx !== null ? '#EF4444' : '#16A34A', color: '#fff', borderRadius: 'var(--r-pill)', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
                   {playingIdx !== null ? <><Square style={{ width: 12, height: 12 }} />Stop</> : <><Play style={{ width: 12, height: 12 }} />Play all</>}
@@ -158,110 +179,85 @@ export default function ContinuousListening() {
         </div>
       </div>
 
-      {/* ── Speaker legend ── */}
-      {uniqueSpeakers.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-5 py-2.5 bg-white border-b border-gray-100 shrink-0">
-          {uniqueSpeakers.map((spk, idx) => {
-            const c = SPEAKER_COLORS[idx % SPEAKER_COLORS.length];
-            const seg = segments.find(s => s.speaker === spk);
-            return (
-              <span key={spk} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${c.light}`}>
-                <span className={`w-3.5 h-3.5 rounded-full ${c.bg} flex items-center justify-center text-[8px] font-bold text-white`}>{idx+1}</span>
-                {spk}{seg?.gender && <span className="opacity-50">{seg.gender === 'female' ? '♀' : '♂'}</span>}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
       {/* ── Conversation area ── */}
       <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface)', borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow-sm)', padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
 
-        {displayItems.length === 0 && !isDiarizing && (
-          <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-20">
-            <div className="w-16 h-16 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center">
-              <Mic className="w-7 h-7 text-gray-300" />
+          {lines.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-20">
+              <div className="w-16 h-16 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                <Mic className="w-7 h-7 text-gray-300" />
+              </div>
+              <p className="text-[15px] text-gray-400 font-medium">
+                {isIdle ? 'Press Start to begin' : 'Listening…'}
+              </p>
             </div>
-            <p className="text-[15px] text-gray-400 font-medium">
-              {isIdle ? 'Press Start to begin' : 'Listening…'}
-            </p>
+          )}
 
-          </div>
-        )}
-
-        {isDiarizing && (
-          <div className="flex items-center justify-center h-32 gap-2 text-[13px] text-gray-400">
-            <Loader2 className="w-4 h-4 animate-spin" />Detecting speakers…
-          </div>
-        )}
-
-        {!isDiarizing && displayItems.map((item, i) => {
-          if (item.processing) {
-            return (
-              <div key={item.id} className="flex gap-2.5 items-end">
-                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                  <Loader2 className="w-3 h-3 text-gray-400 animate-spin" />
+          {lines.map((item, i) => {
+            if (item.processing) {
+              return (
+                <div key={item.id} className="flex gap-2.5 items-end">
+                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                    <Loader2 className="w-3 h-3 text-gray-400 animate-spin" />
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
+                    <div className="flex gap-1 items-center h-4">
+                      {[0,1,2].map(d => <div key={d} className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: `${d*0.15}s` }} />)}
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
-                  <div className="flex gap-1 items-center h-4">
-                    {[0,1,2].map(d => <div key={d} className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: `${d*0.15}s` }} />)}
+              );
+            }
+
+            const synthSeg = synthLines[i];
+            const isPlay   = playingIdx === i;
+
+            return (
+              <div key={item.id || i} className="flex gap-2.5 items-end">
+                <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+                  <Mic className="w-3 h-3 text-gray-500" />
+                </div>
+                <div className="max-w-[72%] flex flex-col gap-1 items-start">
+                  <div className="bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
+                    <p className="text-[14px] leading-relaxed">{item.text}</p>
+                    {item.translation && item.translation !== item.text && (
+                      <p className="text-[12px] mt-1 italic border-t pt-1 text-gray-400 border-gray-100">
+                        {item.translation}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => handleSpeakLine(item)}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                        speakingLineId === item.id ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                      {speakingLineId === item.id
+                        ? <><Square className="w-2.5 h-2.5 fill-red-500" />Stop</>
+                        : <><Volume2 className="w-2.5 h-2.5" />Speak</>}
+                    </button>
+                    {synthSeg?.audio && (
+                      <button onClick={() => isPlay ? stopPlayback() : playSegment(i)}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                          isPlay ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                        {isPlay ? <><Square className="w-2.5 h-2.5 fill-red-500" />Stop</> : <><Play className="w-2.5 h-2.5 fill-gray-500" />Play</>}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             );
-          }
+          })}
 
-          const spkLabel = item.speaker || null;
-          const spkIdx   = spkLabel ? uniqueSpeakers.indexOf(spkLabel) : -1;
-          const color    = SPEAKER_COLORS[Math.max(0, spkIdx) % SPEAKER_COLORS.length];
-          const isRight  = spkIdx > 0 && spkIdx % 2 !== 0;
-          const synthSeg = synthSegments[i];
-          const isPlay   = playingIdx === i;
-
-          return (
-            <div key={item.id || i} className={`flex gap-2.5 items-end ${isRight ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${spkLabel ? `${color.bg} text-white` : 'bg-gray-200 text-gray-500'}`}>
-                {spkLabel ? (Math.max(0, spkIdx) + 1) : <Mic className="w-3 h-3" />}
-              </div>
-              <div className={`max-w-[72%] flex flex-col gap-1 ${isRight ? 'items-end' : 'items-start'}`}>
-                {spkLabel && (
-                  <span className={`text-[10px] font-semibold px-1 ${color.text}`}>
-                    {spkLabel}{item.gender && <span className="ml-1 opacity-50">{item.gender === 'female' ? '♀' : '♂'}</span>}
-                  </span>
-                )}
-                <div className={`rounded-2xl px-4 py-2.5 shadow-sm ${
-                  isRight ? 'bg-gray-900 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'
-                }`}>
-                  <p className="text-[14px] leading-relaxed">{item.text}</p>
-                  {item.translation && item.translation !== item.text && (
-                    <p className={`text-[12px] mt-1 italic border-t pt-1 ${isRight ? 'text-white/50 border-white/10' : 'text-gray-400 border-gray-100'}`}>
-                      {item.translation}
-                    </p>
-                  )}
-                </div>
-                {synthSeg?.audio && (
-                  <button onClick={() => isPlay ? stopPlayback() : playSegment(i)}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
-                      isPlay ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                    {isPlay ? <><Square className="w-2.5 h-2.5 fill-red-500" />Stop</> : <><Play className="w-2.5 h-2.5 fill-gray-500" />Play</>}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        <div ref={boxEndRef} />
-        </div>{/* end scrollable box */}
-      </div>{/* end conversation area */}
+          <div ref={boxEndRef} />
+        </div>
+      </div>
 
       {/* ── Bottom controls ── */}
       <div style={{ padding: '16px 20px', flexShrink: 0, background: 'transparent' }}>
         {isActive && (
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 2, height: 28, marginBottom: 16 }}>
-            {bars.map((h, i) => (
-              <div key={i} style={{ width: 3, borderRadius: 999, background: 'var(--surface-ink)', height: `${h}px`, transition: 'height 75ms' }} />
+            {bars.map((h, idx) => (
+              <div key={idx} style={{ width: 3, borderRadius: 999, background: 'var(--surface-ink)', height: `${h}px`, transition: 'height 75ms' }} />
             ))}
           </div>
         )}

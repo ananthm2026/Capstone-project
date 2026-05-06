@@ -2,6 +2,7 @@
 audio_router.py — Audio processing endpoints.
 POST /api/translate-audio      → Transcribe audio to English + native
 POST /api/diarize-audio        → Speaker diarization
+POST /api/clone-voice          → Clone a voice from audio sample (LMNT)
 POST /api/synthesize-conversation → TTS per speaker segment
 POST /api/text-to-speech       → Text-to-speech conversion
 """
@@ -289,6 +290,151 @@ Transcript:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/clone-voice")
+async def handle_clone_voice(file: UploadFile = File(...)):
+    """
+    Accept an audio sample and create an LMNT voice clone.
+    Returns { voice_id, name } on success.
+    """
+    from services.lmnt_service import clone_voice, is_available
+    if not is_available():
+        raise HTTPException(status_code=503, detail="Voice cloning is not configured (LMNT_API_KEY missing)")
+
+    os.makedirs("temp_audio", exist_ok=True)
+    import uuid
+    ext = os.path.splitext(file.filename or "sample.webm")[1] or ".webm"
+    temp_path = f"temp_audio/clone_{uuid.uuid4().hex[:8]}{ext}"
+
+    try:
+        async with aiofiles.open(temp_path, "wb") as f:
+            while chunk := await file.read(CHUNK_SIZE):
+                await f.write(chunk)
+
+        voice_id = clone_voice(temp_path, voice_name=f"user_clone_{uuid.uuid4().hex[:6]}")
+        return {"voice_id": voice_id}
+    except Exception as e:
+        logger.error(f"clone-voice error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@router.post("/diarize-and-clone")
+async def handle_diarize_and_clone(
+    file: UploadFile = File(None),
+    transcript: str = Form(""),
+):
+    """
+    Diarize transcript into per-speaker segments, then clone each speaker's
+    voice from the audio via LMNT. Returns segments + speaker_voices map.
+    Falls back to Sarvam voices if LMNT is not configured or cloning fails.
+    """
+    full_transcript = transcript.strip()
+    if not full_transcript:
+        raise HTTPException(status_code=422, detail="Transcript is required")
+
+    os.makedirs("temp_audio", exist_ok=True)
+    import uuid, json, re
+    temp_path = None
+
+    if file is not None:
+        ext = os.path.splitext(file.filename or "audio.webm")[1] or ".webm"
+        temp_path = f"temp_audio/dac_{uuid.uuid4().hex[:8]}{ext}"
+        try:
+            async with aiofiles.open(temp_path, "wb") as f:
+                while chunk := await file.read(CHUNK_SIZE):
+                    await f.write(chunk)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"File save failed: {e}")
+
+    try:
+        from services.audio_diarization import diarize_audio_file, extract_speaker_audio_samples
+
+        # Step 1: diarize
+        segments_raw = []
+        method = "text"
+        if temp_path and os.path.exists(temp_path):
+            try:
+                segments_raw = diarize_audio_file(temp_path, full_transcript)
+                if segments_raw:
+                    method = "audio"
+            except Exception as e:
+                logger.warning(f"[dac] audio diarization failed: {e}")
+
+        if not segments_raw:
+            GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+            if GEMINI_KEY:
+                try:
+                    import google.generativeai as genai
+                    genai.configure(api_key=GEMINI_KEY)
+                    model = genai.GenerativeModel("gemini-2.0-flash")
+                    prompt = f"""Split this transcript into speaker turns (2-4 speakers).
+Return ONLY valid JSON array:
+[{{"speaker":"Person 1","text":"...","emotion":"neutral","start":0,"end":0}}]
+
+Transcript:
+{full_transcript}"""
+                    resp = model.generate_content(prompt)
+                    raw = resp.text.strip()
+                    if raw.startswith("```"):
+                        raw = raw.split("```")[1]
+                        if raw.startswith("json"):
+                            raw = raw[4:]
+                    parsed = json.loads(raw.strip())
+                    if isinstance(parsed, list):
+                        segments_raw = [s for s in parsed if str(s.get("text","")).strip()]
+                except Exception as e:
+                    logger.warning(f"[dac] Gemini fallback failed: {e}")
+
+        if not segments_raw:
+            sentences = re.split(r'(?<=[.!?])\s+', full_transcript)
+            segments_raw = [
+                {"speaker": f"Person {(i%2)+1}", "text": s.strip(), "emotion": "neutral", "start": 0, "end": 0}
+                for i, s in enumerate(sentences) if s.strip()
+            ]
+            method = "fallback"
+
+        for seg in segments_raw:
+            seg.setdefault("voice", {})
+        segments = assign_speaker_voices(segments_raw)
+
+        # Step 2: clone per speaker
+        speaker_voices = {}
+        from services.lmnt_service import clone_voice, is_available as lmnt_available
+        if lmnt_available() and temp_path and os.path.exists(temp_path):
+            speaker_audio_paths = extract_speaker_audio_samples(temp_path, segments)
+            for spk, audio_path in speaker_audio_paths.items():
+                try:
+                    voice_id = clone_voice(
+                        audio_path,
+                        voice_name=f"spk_{spk.replace(' ','_').lower()}_{uuid.uuid4().hex[:4]}"
+                    )
+                    speaker_voices[spk] = voice_id
+                    logger.info(f"[dac] Cloned voice for {spk}: {voice_id}")
+                except Exception as e:
+                    logger.warning(f"[dac] Clone failed for {spk}: {e}")
+                finally:
+                    if os.path.exists(audio_path):
+                        os.remove(audio_path)
+
+        return {
+            "segments": segments,
+            "speaker_voices": speaker_voices,
+            "speaker_count": len(set(s["speaker"] for s in segments)),
+            "method": method,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"diarize-and-clone error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
 @router.post("/synthesize-conversation")
 async def handle_synthesize_conversation(request: dict):
     """
@@ -297,6 +443,8 @@ async def handle_synthesize_conversation(request: dict):
     """
     segments = request.get("segments", [])
     target_language = request.get("target_language", "hi-IN")
+    cloned_voice_id = request.get("cloned_voice_id")
+    speaker_voices  = request.get("speaker_voices", {})   # { "Person 1": "lmnt_id" }
     results = []
 
     for seg in segments:
@@ -305,10 +453,18 @@ async def handle_synthesize_conversation(request: dict):
         voice_info = seg.get("voice", {})
         speaker = voice_info.get("sarvam", "anushka")
         gender = voice_info.get("gtts_gender", "female")
+        spk_label = seg.get("speaker", "Person 1")
+
+        # Resolve LMNT voice: per-speaker clone > single global clone > Sarvam
+        lmnt_id = speaker_voices.get(spk_label) or cloned_voice_id
 
         audio_path = None
         try:
-            audio_path = text_to_speech_sarvam(translated_text, target_language, speaker)
+            if lmnt_id:
+                from services.lmnt_service import synthesize as lmnt_synthesize
+                audio_path = lmnt_synthesize(translated_text, lmnt_id, target_language)
+            else:
+                audio_path = text_to_speech_sarvam(translated_text, target_language, speaker)
         except Exception:
             try:
                 gtts_lang = get_gtts_language_code(target_language)
