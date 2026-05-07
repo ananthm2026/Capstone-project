@@ -71,6 +71,22 @@ export default function EnglishToNativeScreen() {
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
+          {/* Language Picker */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.faded, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 }}>Target Language</Text>
+          <TouchableOpacity style={st.langBtn} onPress={() => setShowPicker(!showPicker)}>
+            <Text style={st.langBtnText}>{targetLangName}</Text>
+            <Text>{showPicker ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {showPicker && (
+            <View style={st.pickerDrop}>
+              {LANG_ENTRIES.map(([name, code]) => (
+                <TouchableOpacity key={code} style={[st.pickerItem, code === targetLang && { backgroundColor: COLORS.saffronLight }]} onPress={() => { setTargetLang(code); setTargetLangName(name); setShowPicker(false); }}>
+                  <Text style={[st.pickerText, code === targetLang && { color: COLORS.saffron, fontWeight: '700' }]}>{name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           {/* English Input */}
           <View style={st.card}>
             <View style={st.cardHeader}>
@@ -93,21 +109,6 @@ export default function EnglishToNativeScreen() {
           <TouchableOpacity style={[st.translateBtn, !inputText.trim() && { opacity: 0.5 }]} onPress={handleTranslate} disabled={!inputText.trim() || isTranslating}>
             {isTranslating ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={st.translateBtnText}>Translate to {targetLangName}</Text>}
           </TouchableOpacity>
-
-          {/* Language Picker */}
-          <TouchableOpacity style={st.langBtn} onPress={() => setShowPicker(!showPicker)}>
-            <Text style={st.langBtnText}>{targetLangName}</Text>
-            <Text>{showPicker ? '▲' : '▼'}</Text>
-          </TouchableOpacity>
-          {showPicker && (
-            <View style={st.pickerDrop}>
-              {LANG_ENTRIES.map(([name, code]) => (
-                <TouchableOpacity key={code} style={[st.pickerItem, code === targetLang && { backgroundColor: COLORS.saffronLight }]} onPress={() => { setTargetLang(code); setTargetLangName(name); setShowPicker(false); }}>
-                  <Text style={[st.pickerText, code === targetLang && { color: COLORS.saffron, fontWeight: '700' }]}>{name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
 
           {/* Output */}
           {translatedText ? (

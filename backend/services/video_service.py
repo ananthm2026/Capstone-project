@@ -165,10 +165,25 @@ def process_video_subtitles(video_path: str, target_language: str) -> dict:
         with open(vtt_path, "w", encoding="utf-8") as f:
             f.write(build_vtt(segments))
 
+        # Burn subtitles into video
+        logger.info(f"[subtitle] Burning subtitles into {subtitled_video_path}")
+        try:
+            # Note: We use absolute paths for subtitles filter if possible, or relative to CWD
+            _run([
+                "ffmpeg", "-y", "-i", video_path,
+                "-vf", f"subtitles={srt_path}",
+                "-c:a", "copy",
+                subtitled_video_path
+            ], "burn-in", timeout=300)
+            final_video = subtitled_video_path
+        except Exception as e:
+            logger.error(f"[subtitle] Burn-in failed: {e}. Falling back to original.")
+            final_video = video_path
+
         logger.info(f"[subtitle] Done: {len(segments)} segments")
 
         return {
-            "output_path": video_path,   # serve original video unchanged
+            "output_path": final_video,
             "srt_path": srt_path,
             "vtt_path": vtt_path,
             "source_language": source_language,
@@ -185,3 +200,21 @@ def process_video_subtitles(video_path: str, target_language: str) -> dict:
             except Exception:
                 pass
         # Note: video_path (original upload) and srt/vtt files are kept for download
+
+
+def generate_video_thumbnail(video_path: str) -> str:
+    """Extracts a frame from the video to use as a thumbnail."""
+    out = str(TEMP_DIR / f"thumb_{uuid.uuid4()}.jpg")
+    try:
+        # Try capturing at 1 second mark for a better shot than frame 0
+        _run([
+            "ffmpeg", "-y", "-ss", "00:00:01", "-i", video_path,
+            "-vframes", "1", "-q:v", "2", out
+        ], "thumbnail", timeout=10)
+    except Exception:
+        # Fallback to very beginning if 1s fails
+        _run([
+            "ffmpeg", "-y", "-i", video_path,
+            "-vframes", "1", "-q:v", "2", out
+        ], "thumbnail_fallback", timeout=10)
+    return out

@@ -7,7 +7,7 @@ import { COLORS } from '../../src/constants/colors';
 import { LANGUAGE_LIST } from '../../src/constants/languages';
 
 const { width } = Dimensions.get('window');
-const CARD_W = (width - 48) / 2;
+const CARD_W = (width - 40 - 12) / 2;
 
 const FEATURES = [
   { id: 'n2e', title: 'Speech to Text', desc: 'Push-to-talk with automatic language identification and instant English output', icon: '🎙️', bg: '#FAF0E4', route: '/(drawer)/native-to-english' },

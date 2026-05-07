@@ -19,8 +19,8 @@ export default function VisionScreen() {
   const [imageUri, setImageUri] = useState(null);
   const [regions, setRegions] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [targetLang, setTargetLang] = useState('en-IN');
-  const [targetLangName, setTargetLangName] = useState('Hindi');
+  const [targetLang, setTargetLang] = useState(null);
+  const [targetLangName, setTargetLangName] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
 
   async function pickImage(useCamera) {
@@ -48,6 +48,10 @@ export default function VisionScreen() {
 
   async function handleTranslate() {
     if (!imageUri) return;
+    if (!targetLang) {
+      Alert.alert('Language Required', 'Please select a target language before translating.');
+      return;
+    }
     setIsProcessing(true);
     try {
       const result = await api.visionTranslate(imageUri, targetLang);
@@ -93,7 +97,9 @@ export default function VisionScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={[st.content, { paddingBottom: insets.bottom + 40 }]}>
         {/* Language Picker */}
         <TouchableOpacity style={st.langBtn} onPress={() => setShowPicker(!showPicker)}>
-          <Text style={st.langBtnText}>Translate to: {targetLangName}</Text>
+          <Text style={[st.langBtnText, !targetLangName && { color: COLORS.faded }]}>
+            {targetLangName ? `Translate to: ${targetLangName}` : 'Select language'}
+          </Text>
           <Text>{showPicker ? '▲' : '▼'}</Text>
         </TouchableOpacity>
         {showPicker && (

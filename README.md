@@ -262,7 +262,7 @@ npm install
 
 3. **Start Expo**:
 ```bash
-npx expo start
+npx expo start --clear
 ```
 
 ---

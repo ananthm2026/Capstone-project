@@ -93,10 +93,15 @@ async def _run_job(video_id: str, video_path: str, target_language: str):
     if not job:
         return
     try:
-        from services.video_service import process_video_subtitles, check_ffmpeg
+        from services.video_service import process_video_subtitles, check_ffmpeg, generate_video_thumbnail
         if not check_ffmpeg():
             raise RuntimeError("ffmpeg is not installed on this server.")
         result = await asyncio.to_thread(process_video_subtitles, video_path, target_language)
+        
+        # Generate thumbnail
+        thumb_path = await asyncio.to_thread(generate_video_thumbnail, video_path)
+        result["thumbnail_path"] = thumb_path
+        
         job["status"] = "done"
         job["result"] = result
         logger.info(f"[video] {video_id} done → {result['output_path']}")
@@ -118,6 +123,7 @@ def get_status(video_id: str):
             "video_id": video_id,
             "download_url": f"/api/video/download/{video_id}",
             "srt_url": f"/api/video/srt/{video_id}",
+            "thumbnail_url": f"/api/video/thumbnail/{video_id}",
             "source_language": r.get("source_language"),
             "transcript": r.get("transcript"),
             "translated_text": r.get("translated_text"),
@@ -135,6 +141,17 @@ def download_video(video_id: str):
     if not os.path.exists(path):
         raise HTTPException(404, "File not found on server.")
     return FileResponse(path=path, media_type="video/mp4", filename=f"subtitled_{video_id}.mp4")
+
+
+@router.get("/thumbnail/{video_id}")
+def get_thumbnail(video_id: str):
+    job = _jobs.get(video_id)
+    if not job or job["status"] != "done":
+        raise HTTPException(404, "Thumbnail not ready.")
+    thumb_path = job["result"].get("thumbnail_path", "")
+    if not thumb_path or not os.path.exists(thumb_path):
+        raise HTTPException(404, "Thumbnail file not found.")
+    return FileResponse(path=thumb_path, media_type="image/jpeg")
 
 
 @router.get("/srt/{video_id}")
